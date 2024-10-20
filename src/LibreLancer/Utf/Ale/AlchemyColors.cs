@@ -10,14 +10,14 @@ namespace LibreLancer.Utf.Ale
 {
 	public class AlchemyColors
 	{
-		[XmlAttribute("sParam")]
+		[XmlAttribute("sparam")]
 		public float SParam;
 
-		[XmlElement("type")]
+		[XmlAttribute("type")]
 		public EasingTypes Type;
 
-		[XmlArray("data")]
-		[XmlArrayItem("value")]
+		[XmlArray("Data")]
+		[XmlArrayItem("Value")]
 		public AlchemyKeyFrameColor[] Data;
 
 		public AlchemyColors ()

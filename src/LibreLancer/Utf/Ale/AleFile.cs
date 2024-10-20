@@ -8,13 +8,13 @@ using System.Xml.Serialization;
 
 namespace LibreLancer.Utf.Ale
 {
-	[XmlRoot("ale")]
+	[XmlRoot("Ale")]
 	public class AleFile : UtfFile
 	{
-		[XmlElement("aleEffectLib")]
+		[XmlElement("AlEffectLib")]
 		public ALEffectLib FxLib;
 
-		[XmlElement("alchemyNodeLibrary")]
+		[XmlElement("AlchemyNodeLibrary")]
 		public AlchemyNodeLibrary NodeLib;
 
 		[XmlIgnore]

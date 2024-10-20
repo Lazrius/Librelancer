@@ -15,8 +15,8 @@ namespace LibreLancer.Utf.Ale
 		[XmlAttribute("crc")]
 		public uint CRC;
 
-		[XmlArray("parameters")]
-		[XmlArrayItem("param")]
+		[XmlArray("Parameters")]
+		[XmlArrayItem("Param")]
 		public List<AleParameter> Parameters = new();
 
 		public AlchemyNode ()
@@ -27,7 +27,7 @@ namespace LibreLancer.Utf.Ale
 		{
 			return Name;
 		}
-		
+
 		public bool TryGetParameter(string name, out AleParameter parameter)
 		{
 			parameter = null;

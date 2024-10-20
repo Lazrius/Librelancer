@@ -7,7 +7,7 @@ public struct AlchemyKeyFrameColor
     [XmlAttribute("keyframe")]
     public float Keyframe;
 
-    [XmlElement("color")]
+    [XmlElement("Color")]
     public Color3f Color;
 }
 

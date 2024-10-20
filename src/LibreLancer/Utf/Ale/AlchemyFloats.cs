@@ -11,14 +11,14 @@ namespace LibreLancer.Utf.Ale
 {
 	public sealed class AlchemyFloats
 	{
-		[XmlAttribute("sParam")]
+		[XmlAttribute("sparam")]
 		public float SParam;
 
-		[XmlElement("type")]
+		[XmlAttribute("type")]
 		public EasingTypes Type;
 
-		[XmlArray("data")]
-		[XmlArrayItem("value")]
+		[XmlArray("Data")]
+		[XmlArrayItem("Value")]
 		public AlchemyKeyFrameValue[] Data;
 
 		public AlchemyFloats ()

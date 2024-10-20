@@ -11,40 +11,40 @@ namespace LibreLancer.Utf.Ale
 {
 	public sealed class AlchemyTransform : AlchemyValue
 	{
-        [XmlAttribute("xform")]
+        [XmlIgnore]
 		public uint Xform;
 
-        [XmlElement("translateX")]
+        [XmlElement("TranslateX")]
 		public AlchemyCurveAnimation TranslateX;
 
-        [XmlElement("translateY")]
+        [XmlElement("TranslateY")]
 		public AlchemyCurveAnimation TranslateY;
 
-        [XmlElement("translateZ")]
+        [XmlElement("TranslateZ")]
 		public AlchemyCurveAnimation TranslateZ;
 
-        [XmlElement("pitch")]
+        [XmlElement("Pitch")]
 		public AlchemyCurveAnimation RotatePitch;
 
-        [XmlElement("yaw")]
+        [XmlElement("Yaw")]
 		public AlchemyCurveAnimation RotateYaw;
 
-        [XmlElement("roll")]
+        [XmlElement("Roll")]
 		public AlchemyCurveAnimation RotateRoll;
 
-        [XmlElement("scaleX")]
+        [XmlElement("ScaleX")]
 		public AlchemyCurveAnimation ScaleX;
 
-        [XmlElement("scaleY")]
+        [XmlElement("ScaleY")]
 		public AlchemyCurveAnimation ScaleY;
 
-        [XmlElement("scaleZ")]
+        [XmlElement("ScaleZ")]
 		public AlchemyCurveAnimation ScaleZ;
 
-        [XmlAttribute("hasTransform")]
+        [XmlIgnore]
         public bool HasTransform;
 
-        [XmlAttribute("animates")]
+        [XmlIgnore]
         public bool Animates;
 
 		public AlchemyTransform(BinaryReader reader)
@@ -54,21 +54,24 @@ namespace LibreLancer.Utf.Ale
 			Xform |= (uint)reader.ReadByte ();
 
 			HasTransform = reader.ReadByte () != 0;
-			if (HasTransform) {
-				TranslateX = new AlchemyCurveAnimation (reader);
-				TranslateY = new AlchemyCurveAnimation (reader);
-				TranslateZ = new AlchemyCurveAnimation (reader);
-				RotatePitch = new AlchemyCurveAnimation (reader);
-				RotateYaw = new AlchemyCurveAnimation (reader);
-				RotateRoll = new AlchemyCurveAnimation (reader);
-				ScaleX = new AlchemyCurveAnimation (reader);
-				ScaleY = new AlchemyCurveAnimation (reader);
-				ScaleZ = new AlchemyCurveAnimation (reader);
-                Animates = (TranslateX.Animates || TranslateY.Animates ||
-                    TranslateZ.Animates || RotatePitch.Animates || RotateRoll.Animates ||
-                    RotateYaw.Animates || ScaleX.Animates || ScaleY.Animates || ScaleZ.Animates);
+            if (!HasTransform)
+            {
+                return;
             }
-		}
+
+            TranslateX = new AlchemyCurveAnimation (reader);
+            TranslateY = new AlchemyCurveAnimation (reader);
+            TranslateZ = new AlchemyCurveAnimation (reader);
+            RotatePitch = new AlchemyCurveAnimation (reader);
+            RotateYaw = new AlchemyCurveAnimation (reader);
+            RotateRoll = new AlchemyCurveAnimation (reader);
+            ScaleX = new AlchemyCurveAnimation (reader);
+            ScaleY = new AlchemyCurveAnimation (reader);
+            ScaleZ = new AlchemyCurveAnimation (reader);
+            Animates = (TranslateX.Animates || TranslateY.Animates ||
+                        TranslateZ.Animates || RotatePitch.Animates || RotateRoll.Animates ||
+                        RotateYaw.Animates || ScaleX.Animates || ScaleY.Animates || ScaleZ.Animates);
+        }
 
         public Vector3 GetTranslation(float sparam, float t)
         {

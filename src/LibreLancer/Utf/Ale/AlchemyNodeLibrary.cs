@@ -26,8 +26,8 @@ namespace LibreLancer.Utf.Ale
 		[XmlAttribute("version")]
 		public float Version;
 
-		[XmlArray("nodes")]
-		[XmlArrayItem("node")]
+		[XmlArray("Nodes")]
+		[XmlArrayItem("Node")]
 		public List<AlchemyNode> Nodes = new();
 
 		public AlchemyNodeLibrary()

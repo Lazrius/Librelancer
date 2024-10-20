@@ -11,7 +11,7 @@ namespace LibreLancer.Utf.Ale
 {
 	public class AlchemyCurve
 	{
-        [XmlAttribute("sParam")]
+        [XmlAttribute("sparam")]
 		public float SParam;
 
         [XmlAttribute("value")]
@@ -20,8 +20,8 @@ namespace LibreLancer.Utf.Ale
         [XmlAttribute("flags")]
 		public LoopFlags Flags;
 
-        [XmlArray("keyframes")]
-        [XmlArrayItem("keyframe")]
+        [XmlArray("Keyframes")]
+        [XmlArrayItem("Keyframe")]
 		public List<CurveKeyframe> Keyframes;
 
         [XmlIgnore]

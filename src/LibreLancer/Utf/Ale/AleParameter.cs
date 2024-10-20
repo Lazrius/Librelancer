@@ -13,9 +13,16 @@ namespace LibreLancer.Utf.Ale
 		[XmlAttribute("name")]
 		public string Name;
 
-		[XmlElement("value")]
+        [XmlElement("Bool", typeof(AlchemyBool))]
+        [XmlElement("String", typeof(AlchemyString))]
+        [XmlElement("Integer", typeof(AlchemyInteger))]
+        [XmlElement("Float", typeof(AlchemyFloat))]
+        [XmlElement("CurveAnimation", typeof(AlchemyCurveAnimation))]
+        [XmlElement("ColorAnimation", typeof(AlchemyColorAnimation))]
+        [XmlElement("Pair", typeof(AlchemyPair))]
+        [XmlElement("Transform", typeof(AlchemyTransform))]
+        [XmlElement("FloatAnimation", typeof(AlchemyFloatAnimation))]
 		public AlchemyValue Value;
-		
 
 		public override string ToString()
 		{

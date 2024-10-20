@@ -22,16 +22,16 @@ public class ALEffect
     [XmlAttribute("crc")]
     public uint CRC;
 
-    [XmlArray("tree")]
-    [XmlArrayItem("ref")]
+    [XmlArray("Tree")]
+    [XmlArrayItem("Ref")]
     public List<AlchemyNodeRef> FxTree;
 
-    [XmlArray("fx")]
-    [XmlArrayItem("ref")]
+    [XmlArray("FX")]
+    [XmlArrayItem("Ref")]
     public List<AlchemyNodeRef> Fx;
 
-    [XmlArray("pairs")]
-    [XmlArrayItem("pair")]
+    [XmlArray("Pairs")]
+    [XmlArrayItem("Pair")]
     public List<AleEffectPair> Pairs;
 
     public ALEffect ()

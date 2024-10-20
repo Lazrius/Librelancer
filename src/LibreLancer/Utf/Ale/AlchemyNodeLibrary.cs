@@ -26,8 +26,7 @@ namespace LibreLancer.Utf.Ale
 		[XmlAttribute("version")]
 		public float Version;
 
-		[XmlArray("Nodes")]
-		[XmlArrayItem("Node")]
+		[XmlElement("Node")]
 		public List<AlchemyNode> Nodes = new();
 
 		public AlchemyNodeLibrary()
@@ -87,7 +86,7 @@ namespace LibreLancer.Utf.Ale
                             reader.BaseStream.Seek(valLen & 1, SeekOrigin.Current); //padding
 							break;
 						case AleTypes.IPair:
-                            value = new AlchemyPair() { Left = reader.ReadUInt32(), Right = reader.ReadUInt32() };
+                            value = new AlchemyBlendInfo() { SrcFactor = (BlendFactor)reader.ReadUInt32(), DstFactor = (BlendFactor)reader.ReadUInt32() };
 							break;
 						case AleTypes.Transform:
 							value = new AlchemyTransform (reader);

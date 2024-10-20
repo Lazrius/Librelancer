@@ -104,8 +104,8 @@ namespace LibreLancer.Fx
 
             if (ale.TryGetParameter("BasicApp_BlendInfo", out temp))
             {
-                var vals = (temp.Value as AlchemyPair)!;
-                BlendInfo = BlendMap.Map(new Tuple<uint, uint>(vals.Left, vals.Right));
+                var vals = (temp.Value as AlchemyBlendInfo)!;
+                BlendInfo = BlendMap.Map(new Tuple<uint, uint>((uint)vals.SrcFactor, (uint)vals.DstFactor));
             }
         }
 

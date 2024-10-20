@@ -8,7 +8,7 @@ namespace LibreLancer.Utf.Ale;
 [XmlInclude(typeof(AlchemyFloat))]
 [XmlInclude(typeof(AlchemyFloatAnimation))]
 [XmlInclude(typeof(AlchemyInteger))]
-[XmlInclude(typeof(AlchemyPair))]
+[XmlInclude(typeof(AlchemyBlendInfo))]
 [XmlInclude(typeof(AlchemyString))]
 [XmlInclude(typeof(AlchemyTransform))]
 public class AlchemyValue
@@ -35,11 +35,23 @@ public class AlchemyString : AlchemyValue
     [XmlText] public string Value;
 }
 
-public class AlchemyPair : AlchemyValue
+public enum BlendFactor : byte
 {
-    [XmlAttribute("left")]
-    public uint Left;
+    Invalid = 0,
+    Zero,
+    One,
+    SrcColor,
+    InvSrcColor,
+    SrcAlpha,
+    DestAlpha,
+    InvDestAlpha,
+    DestColor,
+    InvDestColor,
+    SrcAlphaSat
+}
 
-    [XmlAttribute("right")]
-    public uint Right;
+public class AlchemyBlendInfo : AlchemyValue
+{
+    [XmlAttribute("srcFactor")] public BlendFactor SrcFactor;
+    [XmlAttribute("destFactor")] public BlendFactor DstFactor;
 }

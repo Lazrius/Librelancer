@@ -14,11 +14,10 @@ namespace LibreLancer.Utf.Ale
 		[XmlAttribute("sparam")]
 		public float SParam;
 
-		[XmlAttribute("type")]
+		[XmlAttribute("easingType")]
 		public EasingTypes Type;
 
-		[XmlArray("Data")]
-		[XmlArrayItem("Value")]
+        [XmlElement("Keyframe")]
 		public AlchemyKeyFrameValue[] Data;
 
 		public AlchemyFloats ()
@@ -35,13 +34,13 @@ namespace LibreLancer.Utf.Ale
 			float t2 = 0, v1 = 0, v2 = 0;
 			for (var i = 0; i < Data.Length - 1; i++)
             {
-                if (!(time >= Data[i].Keyframe) || !(time <= Data[i + 1].Keyframe))
+                if (!(time >= Data[i].Time) || !(time <= Data[i + 1].Time))
                 {
                     continue;
                 }
 
-                t1 = Data [i].Keyframe;
-                t2 = Data [i + 1].Keyframe;
+                t1 = Data [i].Time;
+                t2 = Data [i + 1].Time;
                 v1 = Data [i].Value;
                 v2 = Data [i + 1].Value;
                 break;
@@ -53,7 +52,7 @@ namespace LibreLancer.Utf.Ale
 
         public float GetMax(bool abs)
         {
-            return Data.Select(i => abs ? Math.Abs(i.Value) : i.Keyframe).Prepend(0).Max();
+            return Data.Select(i => abs ? Math.Abs(i.Value) : i.Time).Prepend(0).Max();
         }
 	}
 }

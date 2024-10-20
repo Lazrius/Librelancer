@@ -10,11 +10,10 @@ namespace LibreLancer.Utf.Ale;
 
 public sealed class AlchemyColorAnimation : AlchemyValue
 {
-    [XmlElement("Type")]
+    [XmlAttribute("easingType")]
     public EasingTypes Type;
 
-    [XmlArray("Items")]
-    [XmlArrayItem("Item")]
+    [XmlElement("Item")]
     public List<AlchemyColors> Items = new();
 
     public AlchemyColorAnimation()
@@ -37,7 +36,7 @@ public sealed class AlchemyColorAnimation : AlchemyValue
             for (var i = 0; i < colors.Data.Length; i++) {
                 colors.Data [i] = new AlchemyKeyFrameColor
                 {
-                    Keyframe = reader.ReadSingle(),
+                    Time = reader.ReadSingle(),
                     Color = new Color3f (reader.ReadSingle (), reader.ReadSingle (), reader.ReadSingle ())
                 };
             }

@@ -20,8 +20,7 @@ namespace LibreLancer.Utf.Ale
         [XmlAttribute("flags")]
 		public LoopFlags Flags;
 
-        [XmlArray("Keyframes")]
-        [XmlArrayItem("Keyframe")]
+        [XmlElement("Keyframe")]
 		public List<CurveKeyframe> Keyframes;
 
         [XmlIgnore]

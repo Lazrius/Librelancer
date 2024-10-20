@@ -15,8 +15,7 @@ namespace LibreLancer.Utf.Ale
         [XmlAttribute("version")]
         public float Version;
 
-        [XmlArray("Effects")]
-        [XmlArrayItem("Effect")]
+        [XmlElement("Effect")]
         public List<ALEffect> Effects;
 
         public ALEffectLib()

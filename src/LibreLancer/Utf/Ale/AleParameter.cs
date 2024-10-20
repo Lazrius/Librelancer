@@ -19,7 +19,7 @@ namespace LibreLancer.Utf.Ale
         [XmlElement("Float", typeof(AlchemyFloat))]
         [XmlElement("CurveAnimation", typeof(AlchemyCurveAnimation))]
         [XmlElement("ColorAnimation", typeof(AlchemyColorAnimation))]
-        [XmlElement("Pair", typeof(AlchemyPair))]
+        [XmlElement("BlendInfo", typeof(AlchemyBlendInfo))]
         [XmlElement("Transform", typeof(AlchemyTransform))]
         [XmlElement("FloatAnimation", typeof(AlchemyFloatAnimation))]
 		public AlchemyValue Value;

@@ -16,8 +16,7 @@ namespace LibreLancer.Utf.Ale
 		[XmlAttribute("type")]
 		public EasingTypes Type;
 
-		[XmlArray("Data")]
-		[XmlArrayItem("Value")]
+		[XmlElement("Keyframe")]
 		public AlchemyKeyFrameColor[] Data;
 
 		public AlchemyColors ()
@@ -35,13 +34,13 @@ namespace LibreLancer.Utf.Ale
 			Color3f v1 = new Color3f(), v2 = new Color3f();
 			for (var i = 0; i < Data.Length - 1; i++)
             {
-                if (!(time >= Data[i].Keyframe) || !(time <= Data[i + 1].Keyframe))
+                if (!(time >= Data[i].Time) || !(time <= Data[i + 1].Time))
                 {
                     continue;
                 }
 
-                t1 = Data [i].Keyframe;
-                t2 = Data [i + 1].Keyframe;
+                t1 = Data [i].Time;
+                t2 = Data [i + 1].Time;
                 v1 = Data [i].Color;
                 v2 = Data [i + 1].Color;
                 break;

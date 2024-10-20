@@ -4,8 +4,8 @@ namespace LibreLancer.Utf.Ale;
 
 public struct AlchemyKeyFrameColor
 {
-    [XmlAttribute("keyframe")]
-    public float Keyframe;
+    [XmlAttribute("time")]
+    public float Time;
 
     [XmlElement("Color")]
     public Color3f Color;
@@ -13,8 +13,8 @@ public struct AlchemyKeyFrameColor
 
 public struct AlchemyKeyFrameValue
 {
-    [XmlAttribute("keyframe")]
-    public float Keyframe;
+    [XmlAttribute("time")]
+    public float Time;
 
     [XmlAttribute("value")]
     public float Value;

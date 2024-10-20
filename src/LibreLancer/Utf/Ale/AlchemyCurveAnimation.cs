@@ -10,11 +10,10 @@ namespace LibreLancer.Utf.Ale;
 
 public sealed class AlchemyCurveAnimation : AlchemyValue
 {
-    [XmlElement("Type")]
+    [XmlAttribute("easingType")]
     public EasingTypes Type;
 
-    [XmlArray("Items")]
-    [XmlArrayItem("Item")]
+    [XmlElement("Item")]
     public List<AlchemyCurve> Items;
 
     public AlchemyCurveAnimation()

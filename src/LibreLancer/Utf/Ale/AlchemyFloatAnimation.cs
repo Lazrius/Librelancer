@@ -10,11 +10,10 @@ namespace LibreLancer.Utf.Ale;
 
 public sealed class AlchemyFloatAnimation : AlchemyValue
 {
-    [XmlElement("Type")]
+    [XmlAttribute("easingType")]
     public EasingTypes Type;
 
-    [XmlArray("Items")]
-    [XmlArrayItem("Item")]
+    [XmlElement("Item")]
     public List<AlchemyFloats> Items = new();
 
     public AlchemyFloatAnimation()
@@ -39,7 +38,7 @@ public sealed class AlchemyFloatAnimation : AlchemyValue
             {
                 floats.Data[i] = new AlchemyKeyFrameValue
                 {
-                    Keyframe = reader.ReadSingle(),
+                    Time = reader.ReadSingle(),
                     Value = reader.ReadSingle ()
                 };
             }

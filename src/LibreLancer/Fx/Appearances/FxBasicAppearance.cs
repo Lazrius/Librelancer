@@ -31,12 +31,12 @@ namespace LibreLancer.Fx
             AleParameter temp;
             if (ale.TryGetParameter("BasicApp_QuadTexture", out temp))
             {
-                QuadTexture = (bool) temp.Value;
+                QuadTexture = (temp.Value as AlchemyBool)!.Value;
             }
 
             if (ale.TryGetParameter("BasicApp_TriTexture", out temp))
             {
-                if ((bool) temp.Value)
+                if ((temp.Value as AlchemyBool)!.Value)
                 {
                     FLLog.Warning("ALE", "BasicApp_TriTexture not implemented");
                 }
@@ -44,7 +44,7 @@ namespace LibreLancer.Fx
 
             if (ale.TryGetParameter("BasicApp_MotionBlur", out temp))
             {
-                MotionBlur = (bool) temp.Value;
+                MotionBlur = (temp.Value as AlchemyBool)!.Value;
             }
 
             if (ale.TryGetParameter("BasicApp_Color", out temp))
@@ -69,12 +69,12 @@ namespace LibreLancer.Fx
 
             if (ale.TryGetParameter("BasicApp_TexName", out temp))
             {
-                Texture = (string) temp.Value;
+                Texture = (temp.Value as AlchemyString)!.Value;
             }
 
             if (ale.TryGetParameter("BasicApp_UseCommonTexFrame", out temp))
             {
-                UseCommonAnimation = (bool) temp.Value;
+                UseCommonAnimation = (temp.Value as AlchemyBool)!.Value;
             }
 
             if (ale.TryGetParameter("BasicApp_TexFrame", out temp))
@@ -89,12 +89,12 @@ namespace LibreLancer.Fx
 
             if (ale.TryGetParameter("BasicApp_FlipTexU", out temp))
             {
-                FlipHorizontal = (bool) temp.Value;
+                FlipHorizontal = (temp.Value as AlchemyBool)!.Value;
             }
 
             if (ale.TryGetParameter("BasicApp_FlipTexV", out temp))
             {
-                FlipVertical = (bool) temp.Value;
+                FlipVertical = (temp.Value as AlchemyBool)!.Value;
             }
 
             if (ale.TryGetParameter("BasicApp_Size", out temp))
@@ -104,7 +104,8 @@ namespace LibreLancer.Fx
 
             if (ale.TryGetParameter("BasicApp_BlendInfo", out temp))
             {
-                BlendInfo = BlendMap.Map((Tuple<uint, uint>) temp.Value);
+                var vals = (temp.Value as AlchemyPair)!;
+                BlendInfo = BlendMap.Map(new Tuple<uint, uint>(vals.Left, vals.Right));
             }
         }
 

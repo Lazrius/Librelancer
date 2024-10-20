@@ -4,6 +4,7 @@
 
 using System;
 using System.Numerics;
+using System.Xml.Serialization;
 
 namespace LibreLancer
 {
@@ -32,9 +33,21 @@ namespace LibreLancer
         public static readonly Color3f White = new Color3f(1, 1, 1);
 		public static readonly Color3f Black = new Color3f(0, 0, 0);
 
+        [XmlAttribute("r")]
 		public float R;
+
+        [XmlAttribute("g")]
 		public float G;
+
+        [XmlAttribute("b")]
 		public float B;
+
+        public Color3f()
+        {
+            R = 0.0f;
+            G = 0.0f;
+            B = 0.0f;
+        }
 
 		public Color3f(float r, float g, float b)
 		{

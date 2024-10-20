@@ -3,51 +3,57 @@
 // LICENSE, which is part of this source code package
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Xml.Serialization;
 
 namespace LibreLancer.Utf.Ale
 {
-	public class AlchemyFloats
+	public sealed class AlchemyFloats
 	{
+		[XmlAttribute("sParam")]
 		public float SParam;
+
+		[XmlElement("type")]
 		public EasingTypes Type;
-		public ValueTuple<float,float>[] Data;
+
+		[XmlArray("data")]
+		[XmlArrayItem("value")]
+		public AlchemyKeyFrameValue[] Data;
+
 		public AlchemyFloats ()
 		{
 		}
+
 		public float GetValue(float time) {
 			//Only have one keyframe? Just return it.
 			if (Data.Length == 1) {
-				return Data [0].Item2;
+				return Data [0].Value;
 			}
 			//Locate the keyframes to interpolate between
-			float t1 = float.NegativeInfinity;
+			var t1 = float.NegativeInfinity;
 			float t2 = 0, v1 = 0, v2 = 0;
-			for (int i = 0; i < Data.Length - 1; i++) {
-				if (time >= Data [i].Item1 && time <= Data [i + 1].Item1) {
-					t1 = Data [i].Item1;
-					t2 = Data [i + 1].Item1;
-					v1 = Data [i].Item2;
-					v2 = Data [i + 1].Item2;
-                    break;
+			for (var i = 0; i < Data.Length - 1; i++)
+            {
+                if (!(time >= Data[i].Keyframe) || !(time <= Data[i + 1].Keyframe))
+                {
+                    continue;
                 }
-			}
-			//Time wasn't between any values. Return max.
-			if (t1 == float.NegativeInfinity) {
-				return Data [Data.Length - 1].Item2;
-			}
-			//Interpolate!
-			return Easing.Ease(Type,time, t1, t2, v1, v2);
-		}
+
+                t1 = Data [i].Keyframe;
+                t2 = Data [i + 1].Keyframe;
+                v1 = Data [i].Value;
+                v2 = Data [i + 1].Value;
+                break;
+            }
+
+            //Time wasn't between any values. Return max.
+            return float.IsNegativeInfinity(t1) ? Data [^1].Value : Easing.Ease(Type,time, t1, t2, v1, v2);
+        }
 
         public float GetMax(bool abs)
         {
-            float max = 0;
-            foreach (var i in Data)
-            {
-                var x = abs ? Math.Abs(i.Item2) : i.Item1;
-                if (x > max) max = x;
-            }
-            return max;
+            return Data.Select(i => abs ? Math.Abs(i.Value) : i.Keyframe).Prepend(0).Max();
         }
 	}
 }

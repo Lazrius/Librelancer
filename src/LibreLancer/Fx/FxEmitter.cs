@@ -20,9 +20,8 @@ namespace LibreLancer.Fx
 		public AlchemyCurveAnimation MaxParticles;
 		public FxEmitter (AlchemyNode ale) : base(ale)
 		{
-			AleParameter temp;
-			if (ale.TryGetParameter ("Emitter_InitialPartices", out temp)) {
-				InitialParticles = (int)temp.Value;
+            if (ale.TryGetParameter ("Emitter_InitialPartices", out var temp)) {
+				InitialParticles = (temp.Value as AlchemyInteger)!.Value;
 			}
 			if (ale.TryGetParameter ("Emitter_Frequency", out temp)) {
 				Frequency = (AlchemyCurveAnimation)temp.Value;

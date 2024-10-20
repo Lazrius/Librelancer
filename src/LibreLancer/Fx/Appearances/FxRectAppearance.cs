@@ -23,11 +23,11 @@ namespace LibreLancer.Fx
 			AleParameter temp;
 			if (ale.TryGetParameter("RectApp_CenterOnPos", out temp))
 			{
-				CenterOnPos = (bool)temp.Value;
+				CenterOnPos = (temp.Value as AlchemyBool)!.Value;
 			}
 			if (ale.TryGetParameter("RectApp_ViewingAngleFade", out temp))
 			{
-				ViewingAngleFade = (bool)temp.Value;
+				ViewingAngleFade = (temp.Value as AlchemyBool)!.Value;
 			}
 			if (ale.TryGetParameter("RectApp_Scale", out temp))
 			{

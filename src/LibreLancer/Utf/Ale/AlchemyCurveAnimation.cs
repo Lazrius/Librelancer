@@ -5,28 +5,38 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Xml.Serialization;
 namespace LibreLancer.Utf.Ale
 {
-	public class AlchemyCurveAnimation
+	public sealed class AlchemyCurveAnimation : AlchemyValue
 	{
+		[XmlElement("type")]
 		public EasingTypes Type;
+
+		[XmlArray("items")]
+		[XmlArrayItem("item")]
 		public List<AlchemyCurve> Items;
+
+		public AlchemyCurveAnimation()
+		{
+
+		}
 
 		public AlchemyCurveAnimation (BinaryReader reader)
 		{
 			Type = (EasingTypes)reader.ReadByte ();
 			int scount = reader.ReadByte ();
 			Items = new List<AlchemyCurve> (scount);
-			for (int i = 0; i < scount; i++) {
+			for (var i = 0; i < scount; i++) {
 				var cpkf = new AlchemyCurve ();
 				cpkf.SParam = reader.ReadSingle ();
 				cpkf.Value = reader.ReadSingle ();
-				ushort loop = reader.ReadUInt16 ();
+				var loop = reader.ReadUInt16 ();
 				cpkf.Flags = (LoopFlags)loop;
-				ushort lcnt = reader.ReadUInt16 ();
+				var lcnt = reader.ReadUInt16 ();
 				if (loop != 0 || lcnt != 0) {
 					var l = new List<CurveKeyframe> (lcnt);
-					for (int j = 0; j < lcnt; j++) {
+					for (var j = 0; j < lcnt; j++) {
 						l.Add (new CurveKeyframe () {
 							Time = reader.ReadSingle(),
 							Value = reader.ReadSingle(),
@@ -67,7 +77,7 @@ namespace LibreLancer.Utf.Ale
 			}
 			//Find 2 keyframes to interpolate between
 			AlchemyCurve c1 = null, c2 = null;
-			for (int i = 0; i < Items.Count - 1; i++) {
+			for (var i = 0; i < Items.Count - 1; i++) {
 				if (sparam >= Items [i].SParam && sparam <= Items [i + 1].SParam) {
 					c1 = Items [i];
 					c2 = Items [i + 1];

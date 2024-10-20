@@ -4,20 +4,30 @@
 
 using System;
 using System.Collections.Generic;
+using System.Xml.Serialization;
 namespace LibreLancer.Utf.Ale
 {
 	public class AlchemyNode
 	{
+		[XmlAttribute("name")]
 		public string Name;
+
+		[XmlAttribute("crc")]
 		public uint CRC;
-		public List<AleParameter> Parameters = new List<AleParameter>();
+
+		[XmlArray("parameters")]
+		[XmlArrayItem("param")]
+		public List<AleParameter> Parameters = new();
+
 		public AlchemyNode ()
 		{
 		}
+
 		public override string ToString ()
 		{
 			return Name;
 		}
+		
 		public bool TryGetParameter(string name, out AleParameter parameter)
 		{
 			parameter = null;

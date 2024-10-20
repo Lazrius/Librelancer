@@ -71,8 +71,8 @@ namespace LibreLancer.Fx
 				}
 				foreach (var pair in effect.Pairs)
 				{
-					var n1 = nodesByIndex[pair.Item1];
-					var n2 = nodesByIndex[pair.Item2];
+					var n1 = nodesByIndex[pair.Source];
+					var n2 = nodesByIndex[pair.Target];
                     if (n1 is EmitterReference er &&
                         n2 is AppearanceReference ar)
                     {

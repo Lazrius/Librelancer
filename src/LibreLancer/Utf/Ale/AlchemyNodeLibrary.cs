@@ -6,6 +6,7 @@ using System;
 using System.IO;
 using System.Text;
 using System.Collections.Generic;
+using System.Xml.Serialization;
 namespace LibreLancer.Utf.Ale
 {
 	public class AlchemyNodeLibrary
@@ -22,49 +23,71 @@ namespace LibreLancer.Utf.Ale
 			CurveAnimation = 0x202
 		}
 
+		[XmlAttribute("version")]
 		public float Version;
-		public List<AlchemyNode> Nodes = new List<AlchemyNode> ();
+
+		[XmlArray("nodes")]
+		[XmlArrayItem("node")]
+		public List<AlchemyNode> Nodes = new();
+
+		public AlchemyNodeLibrary()
+		{
+
+		}
 		public AlchemyNodeLibrary (LeafNode utfleaf)
 		{
 			using (var reader = new BinaryReader (utfleaf.DataSegment.GetReadStream())) {
 				Version = reader.ReadSingle ();
-				int nodeCount = reader.ReadInt32 ();
-				for (int nc = 0; nc < nodeCount; nc++) {
-					ushort nameLen = reader.ReadUInt16 ();
+				var nodeCount = reader.ReadInt32 ();
+				for (var nc = 0; nc < nodeCount; nc++) {
+					var nameLen = reader.ReadUInt16 ();
 					var nodeName = Encoding.ASCII.GetString (reader.ReadBytes (nameLen)).TrimEnd ('\0');
 					reader.BaseStream.Seek(nameLen & 1, SeekOrigin.Current); //padding
-					var node = new AlchemyNode () { Name = nodeName };
-					node.CRC = CrcTool.FLAleCrc(nodeName);
-					uint id, crc;
-					while (true) {
+					var node = new AlchemyNode
+                    {
+                        Name = nodeName,
+                        CRC = CrcTool.FLAleCrc(nodeName)
+                    };
+
+                    uint id, crc;
+					while (true)
+                    {
 						id = reader.ReadUInt16 ();
 						if (id == 0)
-							break;
-						AleTypes type = (AleTypes)(id & 0x7FFF);
-						crc = reader.ReadUInt32 ();
-						string efname;
-						if (!AleCrc.FxCrc.TryGetValue (crc, out efname)) {
-							efname = string.Format ("CRC: 0x{0:X}", crc);
+                        {
+                            break;
+                        }
+
+                        AleTypes type = (AleTypes)(id & 0x7FFF);
+						crc = reader.ReadUInt32();
+
+                        if (!AleCrc.FxCrc.TryGetValue (crc, out var efname))
+                        {
+							efname = $"CRC: 0x{crc:X}";
 						}
-						object value = null;
+                        AlchemyValue value = null;
 						switch (type) {
 						case AleTypes.Boolean:
-							value = (id & 0x8000) != 0 ? true : false;
+							value = new AlchemyBool() { Value = (id & 0x8000) != 0 };
 							break;
 						case AleTypes.Integer:
-							value = reader.ReadUInt32 ();
+							value = new AlchemyInteger() { Value = reader.ReadInt32() };
 							break;
 						case AleTypes.Float:
-							value = reader.ReadSingle ();
+							value = new AlchemyFloat() { Value = reader.ReadSingle () };
 							break;
 						case AleTypes.Name:
-							var vallen = reader.ReadUInt16 ();
-							if (vallen != 0)
-								value = Encoding.ASCII.GetString (reader.ReadBytes (vallen)).TrimEnd ('\0');
-							reader.BaseStream.Seek(vallen & 1, SeekOrigin.Current); //padding
+							var valLen = reader.ReadUInt16 ();
+                            if (valLen != 0)
+                            {
+                                value = new AlchemyString()
+                                    { Value = Encoding.ASCII.GetString(reader.ReadBytes(valLen)).TrimEnd('\0') };
+                            }
+
+                            reader.BaseStream.Seek(valLen & 1, SeekOrigin.Current); //padding
 							break;
 						case AleTypes.IPair:
-							value = new Tuple<uint,uint> (reader.ReadUInt32 (), reader.ReadUInt32 ());
+                            value = new AlchemyPair() { Left = reader.ReadUInt32(), Right = reader.ReadUInt32() };
 							break;
 						case AleTypes.Transform:
 							value = new AlchemyTransform (reader);
@@ -81,15 +104,17 @@ namespace LibreLancer.Utf.Ale
 						default:
 							throw new InvalidDataException ("Invalid ALE Type: 0x" + (id & 0x7FFF).ToString ("x"));
 						}
-						node.Parameters.Add (new AleParameter () { Name = efname, Value = value });
+
+						node.Parameters.Add(new AleParameter () { Name = efname, Value = value });
 					}
-					AleParameter temp;
-					if (node.TryGetParameter("Node_Name", out temp))
+
+                    if (node.TryGetParameter("Node_Name", out var temp))
 					{
-						var nn = (string)temp.Value;
+                        // ReSharper disable once SuspiciousTypeConversion.Global
+                        var nn = (temp.Value as AlchemyString)!.Value;
 						node.CRC = CrcTool.FLAleCrc(nn);
 					}
-					Nodes.Add (node);
+					Nodes.Add(node);
 				}
 			}
 		}

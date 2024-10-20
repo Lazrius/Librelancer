@@ -20,15 +20,15 @@ namespace LibreLancer.Fx
 			AleParameter temp;
 			if (ale.TryGetParameter("BeamApp_DupeFirstParticle", out temp))
 			{
-				DupeFirstParticle = (bool)temp.Value;
+				DupeFirstParticle = (temp.Value as AlchemyBool)!.Value;
 			}
 			if (ale.TryGetParameter("BeamApp_DisablePlaceholder", out temp))
 			{
-				DisablePlaceholder = (bool)temp.Value;
+				DisablePlaceholder = (temp.Value as AlchemyBool)!.Value;
 			}
 			if (ale.TryGetParameter("BeamApp_LineAppearance", out temp))
 			{
-				LineAppearance = (bool)temp.Value;
+				LineAppearance = (temp.Value as AlchemyBool)!.Value;
 			}
 		}
 

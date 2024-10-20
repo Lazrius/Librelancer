@@ -21,7 +21,7 @@ namespace LibreLancer.Fx
 			Name = ale.Name;
 			AleParameter temp;
 			if (ale.TryGetParameter ("Node_Name", out temp)) {
-				NodeName = (string)temp.Value;
+				NodeName = (temp.Value as AlchemyString)!.Value;
 				CRC = CrcTool.FLAleCrc(NodeName);
 			}
 			if (ale.TryGetParameter ("Node_Transform", out temp)) {
@@ -30,7 +30,7 @@ namespace LibreLancer.Fx
 				Transform = new AlchemyTransform ();
 			}
 			if (ale.TryGetParameter ("Node_LifeSpan", out temp)) {
-				NodeLifeSpan = (float)temp.Value;
+				NodeLifeSpan = (temp.Value as AlchemyFloat)!.Value;
 			}
 		}
 

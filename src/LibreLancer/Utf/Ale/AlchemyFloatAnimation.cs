@@ -5,25 +5,45 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Xml.Serialization;
 namespace LibreLancer.Utf.Ale
 {
-	public class AlchemyFloatAnimation
+	public sealed class AlchemyFloatAnimation : AlchemyValue
 	{
+		[XmlElement("type")]
 		public EasingTypes Type;
-		public List<AlchemyFloats> Items = new List<AlchemyFloats> ();
+
+		[XmlArray("items")]
+		[XmlArrayItem("item")]
+		public List<AlchemyFloats> Items = new();
+
+		public AlchemyFloatAnimation()
+		{
+
+		}
+
 		public AlchemyFloatAnimation (BinaryReader reader)
 		{
 			Type = (EasingTypes)reader.ReadByte ();
 			int itemsCount = reader.ReadByte ();
-			for (int fc = 0; fc < itemsCount; fc++) {
-				var floats = new AlchemyFloats ();
-				floats.SParam = reader.ReadSingle ();
-				floats.Type = (EasingTypes)reader.ReadByte ();
-				floats.Data = new ValueTuple<float, float>[reader.ReadByte ()];
-				for (int i = 0; i < floats.Data.Length; i++) {
-					floats.Data [i] = new ValueTuple<float, float> (reader.ReadSingle (), reader.ReadSingle ());
+			for (var fc = 0; fc < itemsCount; fc++)
+            {
+				var floats = new AlchemyFloats
+                {
+                    SParam = reader.ReadSingle (),
+                    Type = (EasingTypes)reader.ReadByte (),
+                    Data = new AlchemyKeyFrameValue[reader.ReadByte ()]
+                };
+
+                for (var i = 0; i < floats.Data.Length; i++)
+                {
+					floats.Data[i] = new AlchemyKeyFrameValue
+                    {
+                        Keyframe = reader.ReadSingle(),
+                        Value = reader.ReadSingle ()
+                    };
 				}
-				Items.Add (floats);
+				Items.Add(floats);
 			}
 		}
 
@@ -45,7 +65,7 @@ namespace LibreLancer.Utf.Ale
 			}
 			//Find 2 keyframes to interpolate between
 			AlchemyFloats f1 = null, f2 = null;
-			for (int i = 0; i < Items.Count - 1; i++) {
+			for (var i = 0; i < Items.Count - 1; i++) {
 				if (sparam >= Items [i].SParam && sparam <= Items [i + 1].SParam) {
 					f1 = Items [i];
 					f2 = Items [i + 1];

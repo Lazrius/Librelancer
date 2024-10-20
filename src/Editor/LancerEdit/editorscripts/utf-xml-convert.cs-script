@@ -1,0 +1,192 @@
+// [Script]
+// name = Convert UTF to/from XML
+
+using System;
+using System.Numerics;
+using System.Xml;
+using System.IO;
+using LibreLancer;
+using LibreLancer.Utf;
+using LibreLancer.Utf.Ale;
+using LibreLancer.Utf.Anm;
+using LibreLancer.Utf.Audio;
+using LibreLancer.Utf.Mat;
+using WattleScript.Interpreter;
+using System.Xml.Serialization;
+
+ScriptUsage(@"-src='input file / input directory' -dest='output file / output directory'
+Output will be .xml if the input is .ale|.cmp|.3db, else it will be determined by the xml file.");
+
+string input = "";
+string output = "";
+int threadCount = 1;
+StringOption("src=", "Source File / Directory", x => input = x);
+StringOption("dest=", "Source File / Directory", x => output = x);
+IntegerOption("threads=", "Thread Count (default 1)", v => threadCount = v);
+
+void XmlToUtf(string file)
+{
+
+}
+
+void UtfToXml(string file)
+{
+    var utf = Autodetect.Load(file);
+    string contents = null;
+
+    if (utf.Ale is not null)
+    {
+        contents = Serializer<AleFile>.Serialize(utf.Ale);
+    }
+
+    if (contents is null)
+    {
+        Console.WriteLine($"Unable to detect type of file: {file}");
+        return;
+    }
+
+    File.WriteAllText(output, contents);
+}
+
+// Script Start
+
+_ = ParseArguments();
+
+if (input is "" || output is "" || threadCount <= 0)
+{
+    Console.WriteLine(@"Invalid options provided.
+    src and dest must be valid file/folder paths.
+    threads must be greater or equal to 1.");
+    return;
+}
+
+bool isFile = false;
+if (!File.Exists(input))
+{
+    if (!Directory.Exists(input))
+    {
+        Console.WriteLine("Input was not an existing file or directory.");
+        return;
+    }
+}
+else
+{
+    isFile = true;
+}
+
+if (isFile)
+{
+    if (input.EndsWith(".xml"))
+    {
+        XmlToUtf(input);
+        return;
+    }
+
+    UtfToXml(input);
+    return;
+}
+
+enum UtfType
+{
+    Ale,
+    Audio,
+    VisualResource,
+}
+
+public class Autodetect : UtfFile
+{
+    public AleFile Ale;
+    public AnmFile StandardAnm;
+    public IDrawable Drawable;
+    public TxmFile Textures;
+    public MatFile Materials;
+    public VoiceUtf Voice;
+
+    public static Autodetect Load(string file)
+    {
+        IntermediateNode root;
+        using (var stream = File.OpenRead(file))
+        {
+            root = parseFile(file, stream);
+        }
+
+        bool hasAnm = false;
+        bool hasAle = false;
+        bool isModel = false;
+        bool maybeAudio = false;
+        IntermediateNode textureLibrary = null;
+        IntermediateNode materialLibrary = null;
+        foreach (var n in root)
+        {
+            if (n.Name.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                maybeAudio = true;
+            switch (n.Name.ToLowerInvariant())
+            {
+                case "aleffectlib":
+                case "alchemynodelibrary":
+                    hasAle = true;
+                    break;
+                case "sphere":
+                case "vmeshpart":
+                case "cmpnd":
+                case "multilevel":
+                case "hardpoints":
+                case "skeleton":
+                    isModel = true;
+                    break;
+                case "script":
+                    hasAnm = true;
+                    break;
+                case "texture library":
+                    textureLibrary = (IntermediateNode)n;
+                    break;
+                case "material library":
+                    materialLibrary = (IntermediateNode)n;
+                    break;
+            }
+            if (hasAle || isModel)
+                break;
+        }
+
+        var ad = new Autodetect();
+        if (hasAle)
+        {
+            using var stream = File.OpenRead(file);
+            ad.Ale = new AleFile(file, stream);
+        }
+        else if (isModel)
+        {
+            ad.Drawable = UtfLoader.GetDrawable(root, null, file);
+        }
+        else if (textureLibrary != null || materialLibrary != null)
+        {
+            if (textureLibrary != null)
+                ad.Textures = new TxmFile(textureLibrary);
+            if(materialLibrary != null)
+                ad.Materials = new MatFile(materialLibrary);
+        }
+        else if (hasAnm)
+        {
+            using var stream = File.OpenRead(file);
+            ad.StandardAnm = new AnmFile(file, stream);
+        }
+        else if (maybeAudio)
+        {
+            using var stream = File.OpenRead(file);
+            ad.Voice = new VoiceUtf(file, stream);
+        }
+
+        return ad;
+    }
+}
+
+public class Serializer<T> where T : class
+{
+    public static string Serialize(T obj)
+    {
+        XmlSerializer xs = new XmlSerializer(typeof(T));
+        using var textWriter = new StringWriter();
+        xs.Serialize(textWriter, obj);
+        return textWriter.ToString();
+    }
+}

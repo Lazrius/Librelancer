@@ -3,19 +3,23 @@
 // LICENSE, which is part of this source code package
 
 using System;
+using System.Xml;
+using System.Xml.Serialization;
 
 namespace LibreLancer.Utf.Ale
 {
 	public class AleParameter
 	{
+		[XmlAttribute("name")]
 		public string Name;
-		public object Value;
-		public AleParameter ()
+
+		[XmlElement("value")]
+		public AlchemyValue Value;
+		
+
+		public override string ToString()
 		{
-		}
-		public override string ToString ()
-		{
-			return string.Format ("[{0}: {1}]", Name, Value);
+			return $"[{Name}: {Value}]";
 		}
 	}
 }

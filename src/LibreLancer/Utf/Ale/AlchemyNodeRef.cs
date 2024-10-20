@@ -4,15 +4,28 @@
 
 using System;
 using System.Collections.Generic;
+using System.Xml.Serialization;
 namespace LibreLancer.Utf.Ale
 {
 	public class AlchemyNodeRef
 	{
+		[XmlAttribute("flag")]
 		public uint Flag;
+
+		[XmlAttribute("crc")]
 		public uint CRC;
+
+		[XmlAttribute("parent")]
 		public uint Parent;
+
+		[XmlAttribute("index")]
 		public uint Index;
-		public List<AlchemyNodeRef> Children = new List<AlchemyNodeRef> ();
+
+		public AlchemyNodeRef()
+		{
+
+		}
+
 		public AlchemyNodeRef(uint flg, uint crc, uint parent, uint idx)
 		{
 			Flag = flg;
@@ -20,6 +33,7 @@ namespace LibreLancer.Utf.Ale
 			Parent = parent;
 			Index = idx;
 		}
+
 		public bool IsAttachmentNode {
 			get {
 				return Flag == 1;

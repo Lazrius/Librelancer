@@ -5,16 +5,26 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml.Serialization;
 
 namespace LibreLancer.Utf.Ale
 {
 	public class AlchemyCurve
 	{
+        [XmlAttribute("sParam")]
 		public float SParam;
+
+        [XmlAttribute("value")]
 		public float Value;
+
+        [XmlAttribute("flags")]
 		public LoopFlags Flags;
+
+        [XmlArray("keyframes")]
+        [XmlArrayItem("keyframe")]
 		public List<CurveKeyframe> Keyframes;
 
+        [XmlIgnore]
         public bool Animates
         {
             get { return Keyframes != null && Keyframes.Count != 1; }
@@ -51,9 +61,9 @@ namespace LibreLancer.Utf.Ale
                     default:
                         return Keyframes[Keyframes.Count - 1].Value;
 				}
-				
+
 			}
-			for (int i = 0; i < Keyframes.Count - 1; i++)
+			for (var i = 0; i < Keyframes.Count - 1; i++)
 			{
 				var a = Keyframes[i];
 				var b = Keyframes[i + 1];
@@ -71,14 +81,14 @@ namespace LibreLancer.Utf.Ale
         {
             var dt = b.Time - a.Time;
             var dt2 = dt * 0.5f;
-            
+
             var t0 = (t - a.Time) / dt;
             var ax = a.Value;
             var bx = b.Value;
 
             var a0 = MathF.FusedMultiplyAdd(a.Start, dt2, ax);
             var b0 = MathF.FusedMultiplyAdd(-b.End, dt2, bx);
-            
+
             var a1 = MathHelper.Lerp( ax, a0, t0);
             var b1 = MathHelper.Lerp( a0, bx, t0);
 

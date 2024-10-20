@@ -8,7 +8,8 @@ namespace LibreLancer.Utf.Ale
 {
 	static class AleCrc
 	{
-		public static readonly Dictionary<uint, string> FxCrc = new Dictionary<uint,string> {
+		public static readonly Dictionary<uint, string> FxCrc = new() 
+		{
 			//MANUAL ENTRIES
 			{ 0x1C65B7B9, "BeamApp_LineAppearance" },
 			//AUTO-GENERATED ENTRIES

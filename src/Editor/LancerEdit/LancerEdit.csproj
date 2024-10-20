@@ -51,6 +51,9 @@
         <None Remove="Updater\Sfx-linux" />
         <EmbeddedResource Include="Updater\Sfx-linux" />
         <None Remove="Updater\Sfx-win" />
+        <None Update="editorscripts\utf-xml-convert.cs-script">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
     <Import Project="..\..\PublishAssets\PublishAssets.projitems" Label="Shared" />
 </Project>

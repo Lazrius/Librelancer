@@ -5,24 +5,49 @@
 using System;
 using System.IO;
 using System.Numerics;
+using System.Xml.Serialization;
 
 namespace LibreLancer.Utf.Ale
 {
-	public class AlchemyTransform
+	public sealed class AlchemyTransform : AlchemyValue
 	{
+        [XmlAttribute("xform")]
 		public uint Xform;
+
+        [XmlElement("translateX")]
 		public AlchemyCurveAnimation TranslateX;
+
+        [XmlElement("translateY")]
 		public AlchemyCurveAnimation TranslateY;
+
+        [XmlElement("translateZ")]
 		public AlchemyCurveAnimation TranslateZ;
+
+        [XmlElement("pitch")]
 		public AlchemyCurveAnimation RotatePitch;
+
+        [XmlElement("yaw")]
 		public AlchemyCurveAnimation RotateYaw;
+
+        [XmlElement("roll")]
 		public AlchemyCurveAnimation RotateRoll;
+
+        [XmlElement("scaleX")]
 		public AlchemyCurveAnimation ScaleX;
+
+        [XmlElement("scaleY")]
 		public AlchemyCurveAnimation ScaleY;
+
+        [XmlElement("scaleZ")]
 		public AlchemyCurveAnimation ScaleZ;
+
+        [XmlAttribute("hasTransform")]
         public bool HasTransform;
+
+        [XmlAttribute("animates")]
         public bool Animates;
-		public AlchemyTransform (BinaryReader reader)
+
+		public AlchemyTransform(BinaryReader reader)
 		{
 			Xform = (uint)reader.ReadByte () << 8;
 			Xform |= (uint)reader.ReadByte () << 4;
@@ -44,7 +69,7 @@ namespace LibreLancer.Utf.Ale
                     RotateYaw.Animates || ScaleX.Animates || ScaleY.Animates || ScaleZ.Animates);
             }
 		}
-		
+
         public Vector3 GetTranslation(float sparam, float t)
         {
             if (!HasTransform)
@@ -99,7 +124,7 @@ namespace LibreLancer.Utf.Ale
 
             return Quaternion.CreateFromYawPitchRoll(
                 MathHelper.DegreesToRadians(y2 - y1),
-                MathHelper.DegreesToRadians(x2 - x1), 
+                MathHelper.DegreesToRadians(x2 - x1),
                 MathHelper.DegreesToRadians(z2 - z1)
             );
         }

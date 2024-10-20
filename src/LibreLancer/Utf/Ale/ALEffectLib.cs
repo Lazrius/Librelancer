@@ -6,25 +6,35 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Xml.Serialization;
 
 namespace LibreLancer.Utf.Ale
 {
     public class ALEffectLib
     {
+        [XmlAttribute("version")]
         public float Version;
+
+        [XmlArray("effects")]
+        [XmlArrayItem("effect")]
         public List<ALEffect> Effects;
+
+        public ALEffectLib()
+        {
+
+        }
 
         public ALEffectLib(LeafNode node)
         {
             using BinaryReader reader = new(node.DataSegment.GetReadStream());
             Version = reader.ReadSingle();
 
-            int effectCount = reader.ReadInt32();
+            var effectCount = reader.ReadInt32();
             Effects = new List<ALEffect>(effectCount);
 
-            for (int ef = 0; ef < effectCount; ef++)
+            for (var ef = 0; ef < effectCount; ef++)
             {
-                string name = ReadName(reader);
+                var name = ReadName(reader);
                 SkipUnusedFloats(reader);
                 Effects.Add(new ALEffect {
                     Name = name,
@@ -37,9 +47,9 @@ namespace LibreLancer.Utf.Ale
 
         private static string ReadName(BinaryReader reader)
         {
-            ushort nameLen = reader.ReadUInt16();
+            var nameLen = reader.ReadUInt16();
             Span<byte> nameBytes = stackalloc byte[nameLen];
-            int bytesRead = reader.Read(nameBytes);
+            var bytesRead = reader.Read(nameBytes);
 
             Span<byte> name = nameBytes[..^1]; // Get rid of \0
             reader.BaseStream.Seek(nameLen & 1, SeekOrigin.Current);
@@ -57,9 +67,9 @@ namespace LibreLancer.Utf.Ale
 
         private static List<AlchemyNodeRef> ReadAlchemyNodeReferences(BinaryReader reader)
         {
-            int fxCount = reader.ReadInt32();
+            var fxCount = reader.ReadInt32();
             List<AlchemyNodeRef> refs = new(fxCount);
-            for (int i = 0; i < fxCount; i++)
+            for (var i = 0; i < fxCount; i++)
             {
                 refs.Add(new AlchemyNodeRef(
                     reader.ReadUInt32(),
@@ -72,20 +82,20 @@ namespace LibreLancer.Utf.Ale
             return refs;
         }
 
-        private static List<(uint, uint)> ReadPairs(BinaryReader reader)
+        private static List<AleEffectPair> ReadPairs(BinaryReader reader)
         {
-            int pairsCount = reader.ReadInt32();
-            List<(uint, uint)> pairs = new(pairsCount);
-            int remainingBytes = (int)(reader.BaseStream.Length - reader.BaseStream.Position);
-            int pairByteSize = (sizeof(uint) * 2);
-            int requiredBytes = pairsCount * pairByteSize;
+            var pairsCount = reader.ReadInt32();
+            List<AleEffectPair> pairs = new(pairsCount);
+            var remainingBytes = (int)(reader.BaseStream.Length - reader.BaseStream.Position);
+            var pairByteSize = (sizeof(uint) * 2);
+            var requiredBytes = pairsCount * pairByteSize;
 
             // invalid pairs, i.e. emitter without appearance, will increase pair count but not amount of bytes.
-            if (requiredBytes > remainingBytes) 
+            if (requiredBytes > remainingBytes)
                 pairsCount = remainingBytes / pairByteSize;
 
-            for (int i = 0; i < pairsCount; i++)
-                pairs.Add((reader.ReadUInt32(), reader.ReadUInt32()));
+            for (var i = 0; i < pairsCount; i++)
+                pairs.Add(new AleEffectPair() { Source = reader.ReadUInt32(), Target = reader.ReadUInt32() });
 
             return pairs;
         }

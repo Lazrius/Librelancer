@@ -4,18 +4,27 @@
 
 using System;
 using System.IO;
+using System.Xml.Serialization;
 
 namespace LibreLancer.Utf.Ale
 {
+	[XmlRoot("ale")]
 	public class AleFile : UtfFile
 	{
+		[XmlElement("aleEffectLib")]
 		public ALEffectLib FxLib;
+
+		[XmlElement("alchemyNodeLibrary")]
 		public AlchemyNodeLibrary NodeLib;
+
+		[XmlIgnore]
         public string Path;
+
 		public AleFile(string file, Stream stream) : this(parseFile(file, stream))
         {
             Path = file;
         }
+
 		public AleFile (IntermediateNode root)
 		{
 			//TODO: This is ugly
@@ -33,6 +42,11 @@ namespace LibreLancer.Utf.Ale
 			}
             Path = "[utf]";
         }
+
+		public AleFile()
+		{
+
+		}
 	}
 }
 

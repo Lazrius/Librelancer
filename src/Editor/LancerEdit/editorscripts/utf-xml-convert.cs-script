@@ -5,14 +5,24 @@ using System;
 using System.Numerics;
 using System.Xml;
 using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Xml.Serialization;
 using LibreLancer;
 using LibreLancer.Utf;
 using LibreLancer.Utf.Ale;
 using LibreLancer.Utf.Anm;
 using LibreLancer.Utf.Audio;
 using LibreLancer.Utf.Mat;
+using LibreLancer.ContentEdit;
 using WattleScript.Interpreter;
-using System.Xml.Serialization;
+using ExtendedXmlSerializer;
+using ExtendedXmlSerializer.Configuration;
+using ExtendedXmlSerializer.ContentModel;
+using ExtendedXmlSerializer.ContentModel.Content;
+using ExtendedXmlSerializer.ContentModel.Format;
+using ExtendedXmlSerializer.Core;
+using ExtendedXmlSerializer.ExtensionModel;
 
 ScriptUsage(@"-src='input file / input directory' -dest='output file / output directory'
 Output will be .xml if the input is .ale|.cmp|.3db, else it will be determined by the xml file.");
@@ -37,6 +47,25 @@ void UtfToXml(string file)
     if (utf.Ale is not null)
     {
         contents = Serializer<AleFile>.Serialize(utf.Ale);
+    }
+    else if (utf.Voice is not null)
+    {
+        UtfVoice voice = new();
+        voice.Lines = utf.Voice.AudioFiles.Select(x => new UtfVoice.VoiceLine { Id = x.Key, Data = x.Value }).ToArray();
+
+        contents = Serializer<UtfVoice>.Serialize(voice);
+    }
+    else if (utf.Textures is not null)
+    {
+        contents = Serializer<TxmFile>.Serialize(utf.Textures);
+    }
+    else if (utf.Materials is not null)
+    {
+        contents = Serializer<MatFile>.Serialize(utf.Materials);
+    }
+    else if (utf.StandardAnm is not null)
+    {
+        contents = Serializer<AnmFile>.Serialize(utf.StandardAnm);
     }
 
     if (contents is null)
@@ -180,13 +209,69 @@ public class Autodetect : UtfFile
     }
 }
 
+public sealed class Extension : ISerializerExtension
+{
+    public static Extension Default { get; } = new Extension();
+
+    public Extension() {}
+    public IServiceRepository Get(IServiceRepository parameter) => parameter.DecorateContentsWith<Contents>().Then();
+    void ICommand<IServices>.Execute(IServices parameter) {}
+
+    public sealed class Contents : IContents
+    {
+        readonly IContents        _previous;
+        readonly ISerializer<ArraySegment<byte>?> _arraySegmentSerializer;
+
+        public Contents(IContents previous)
+            : this(previous, new ArraySegmentByteSerializer(previous.Get(typeof(ArraySegment<byte>?)).For<ArraySegment<byte>?>())) {}
+
+        public Contents(IContents previous, ISerializer<ArraySegment<byte>?> arraySegmentSerializer)
+        {
+            _previous = previous;
+            _arraySegmentSerializer = arraySegmentSerializer;
+        }
+
+        public ISerializer Get(TypeInfo parameter)
+            => parameter == typeof(ArraySegment<byte>?) ? _arraySegmentSerializer.Adapt() : _previous.Get(parameter);
+    }
+
+    public sealed class ArraySegmentByteSerializer : ISerializer<ArraySegment<byte>?>
+    {
+        public ArraySegmentByteSerializer(ISerializer<ArraySegment<byte>?> _) {}
+
+        public ArraySegment<byte>? Get(IFormatReader parameter)
+        {
+            var data = parameter.Content();
+            Span<byte> buffer = new Span<byte>(new byte[data.Length]);
+            Convert.TryFromBase64String(data, buffer, out int bytesParsed);
+            if (bytesParsed != buffer.Length)
+            {
+                throw new ArgumentException(nameof(data), "Invalid Base64 String");
+            }
+
+            return new ArraySegment<byte>?(buffer.ToArray());
+        }
+
+        public void Write(IFormatWriter writer, ArraySegment<byte>? instance)
+        {
+            writer.Content(Convert.ToBase64String(instance.Value.Array));
+        }
+    }
+}
+
 public class Serializer<T> where T : class
 {
     public static string Serialize(T obj)
     {
-        XmlSerializer xs = new XmlSerializer(typeof(T));
-        using var textWriter = new StringWriter();
-        xs.Serialize(textWriter, obj);
-        return textWriter.ToString();
+        IExtendedXmlSerializer serializer = new ConfigurationContainer()
+            .UseAutoFormatting()
+            .EnableImplicitTyping(typeof(T))
+            .Extend(Extension.Default)
+            .Create();
+
+        return serializer.Serialize(new XmlWriterSettings()
+        {
+            Indent = true,
+        }, obj);
     }
 }

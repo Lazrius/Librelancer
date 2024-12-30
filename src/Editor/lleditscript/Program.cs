@@ -13,11 +13,18 @@ using Microsoft.CodeAnalysis.Scripting;
 using System.Numerics;
 using System.Reflection;
 using System.Threading.Tasks;
+using ExtendedXmlSerializer;
+using ExtendedXmlSerializer.ContentModel;
+using ExtendedXmlSerializer.ContentModel.Content;
+using ExtendedXmlSerializer.ContentModel.Format;
+using ExtendedXmlSerializer.Core;
+using ExtendedXmlSerializer.ExtensionModel;
 using LibreLancer;
 using LibreLancer.ContentEdit;
 using LibreLancer.Data;
 using LibreLancer.Options;
 using Microsoft.CodeAnalysis;
+using TypeInfo = System.Reflection.TypeInfo;
 
 namespace lleditscript
 {
@@ -142,7 +149,8 @@ namespace lleditscript
             var opts = ScriptOptions.Default.WithReferences(
                     typeof(Vector3).Assembly, typeof(FreelancerData).Assembly,
                     typeof(FreelancerGame).Assembly, typeof(string).Assembly,
-                    typeof(EditableUtf).Assembly, typeof(Game).Assembly)
+                    typeof(EditableUtf).Assembly, typeof(Game).Assembly,
+                    typeof(IExtendedXmlSerializer).Assembly)
                 .WithImports(Namespaces).WithAllowUnsafe(true).WithFilePath(filePath);
             var script = CSharpScript.Create(scriptText, opts, typeof(Globals));
             var result = script.Compile();

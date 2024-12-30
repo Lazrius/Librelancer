@@ -12,8 +12,9 @@ namespace LibreLancer.Utf.Mat
 {
 	public class TxmFile : UtfFile
 	{
-		public Dictionary<string, TextureData> Textures { get; private set; }
-		public Dictionary<string, TexFrameAnimation> Animations { get; private set; }
+		public Dictionary<string, TextureData> Textures { get; set; }
+		public Dictionary<string, TexFrameAnimation> Animations { get; set; }
+
         public TxmFile()
         {
             Textures = new Dictionary<string, TextureData>();

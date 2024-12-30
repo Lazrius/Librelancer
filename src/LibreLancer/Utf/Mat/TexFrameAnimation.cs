@@ -13,6 +13,11 @@ namespace LibreLancer.Utf.Mat
 		public int FrameCount = 0;
 		public float FPS;
 		public TexFrame[] Frames;
+
+        public TexFrameAnimation()
+        {
+        }
+
 		public TexFrameAnimation(IntermediateNode node)
 		{
 			foreach (var child in node)

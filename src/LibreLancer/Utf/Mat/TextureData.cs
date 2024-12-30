@@ -14,62 +14,66 @@ namespace LibreLancer.Utf.Mat
 	{
         public static bool Bitch = false;
 
-		private string type;
-		private string texname;
-        private ArraySegment<byte>? data;
-        public Texture Texture { get; private set; }
-		Dictionary<int, byte[]> levels;
+		public string Type;
+		public string Texname;
+        public ArraySegment<byte>? Data;
+        public Texture Texture { get; set; }
+		public Dictionary<int, byte[]> Levels;
+
+        public TextureData()
+        {
+        }
 
 		public TextureData (LeafNode node, string texname, bool isTgaMips)
 		{
-			this.type = node.Name;
-			this.texname = texname;
-            this.data = node.DataSegment;
+			this.Type = node.Name;
+			this.Texname = texname;
+            this.Data = node.DataSegment;
 			if (isTgaMips)
-				levels = new Dictionary<int, byte[]>();
+				Levels = new Dictionary<int, byte[]>();
 		}
 
 
         public ImageResource GetImageResource()
         {
-            if (data != null && data.Value.Count > 0)
+            if (Data != null && Data.Value.Count > 0)
             {
-                if (type.Equals("mips", StringComparison.OrdinalIgnoreCase))
-                    return new ImageResource(ImageType.DDS, data.Value.ToArray());
-                else if (type.Equals("mipu", StringComparison.OrdinalIgnoreCase))
-                    return new ImageResource(ImageType.LIF, data.Value.ToArray());
-                else if (type.StartsWith("mip", StringComparison.OrdinalIgnoreCase))
-                    return new ImageResource(ImageType.TGA, data.Value.ToArray());
+                if (Type.Equals("mips", StringComparison.OrdinalIgnoreCase))
+                    return new ImageResource(ImageType.DDS, Data.Value.ToArray());
+                else if (Type.Equals("mipu", StringComparison.OrdinalIgnoreCase))
+                    return new ImageResource(ImageType.LIF, Data.Value.ToArray());
+                else if (Type.StartsWith("mip", StringComparison.OrdinalIgnoreCase))
+                    return new ImageResource(ImageType.TGA, Data.Value.ToArray());
             }
             return null;
         }
 
 		public void Initialize (RenderContext context)
 		{
-			if (data != null && data.Value.Count > 0 && Texture == null)
+			if (Data != null && Data.Value.Count > 0 && Texture == null)
             {
-				using (Stream stream = data.Value.GetReadStream()) {
-					if (type.Equals ("mips", StringComparison.OrdinalIgnoreCase))
+				using (Stream stream = Data.Value.GetReadStream()) {
+					if (Type.Equals ("mips", StringComparison.OrdinalIgnoreCase))
                     {
                         Texture = ImageLib.DDS.FromStream(context, stream);
 					}
-                    else if (type.Equals("mipu", StringComparison.OrdinalIgnoreCase))
+                    else if (Type.Equals("mipu", StringComparison.OrdinalIgnoreCase))
                     {
                         Texture = ImageLib.LIF.TextureFromStream(context, stream);
                     }
-                    else if (type.StartsWith ("mip", StringComparison.OrdinalIgnoreCase))
+                    else if (Type.StartsWith ("mip", StringComparison.OrdinalIgnoreCase))
                     {
-						var tga = ImageLib.TGA.TextureFromStream(context, stream, levels != null);
+						var tga = ImageLib.TGA.TextureFromStream(context, stream, Levels != null);
                         if(tga == null) {
-                            FLLog.Error("Mat","Texture " + texname + "\\MIP0" + " is bad");
+                            FLLog.Error("Mat","Texture " + Texname + "\\MIP0" + " is bad");
                             if (Bitch) throw new Exception("Your texture data is bad, fix it!\n" +
-                                                           texname + "\\MIP0 to be exact");
+                                                           Texname + "\\MIP0 to be exact");
                             Texture = null;
                             return;
                         }
-						if (levels != null)
+						if (Levels != null)
 						{
-							foreach (var lv in levels)
+							foreach (var lv in Levels)
 							{
 								using (var s2 = new MemoryStream(lv.Value)) {
 									ImageLib.TGA.TextureFromStream(context, s2, true, tga, lv.Key);
@@ -77,15 +81,15 @@ namespace LibreLancer.Utf.Mat
 							}
 						}
 						Texture = tga;
-						levels = null;
+						Levels = null;
 					}
-                    else if (type.Equals ("cube", StringComparison.OrdinalIgnoreCase))
+                    else if (Type.Equals ("cube", StringComparison.OrdinalIgnoreCase))
                     {
 						Texture = ImageLib.DDS.FromStream (context, stream);
 					}
 				}
 			} else
-				FLLog.Error ("Texture " + texname, "data == null");
+				FLLog.Error ("Texture " + Texname, "data == null");
 		}
 
 		public void SetLevel(Node node)
@@ -99,12 +103,12 @@ namespace LibreLancer.Utf.Mat
 			var mipLevel = int.Parse(name.Substring(3));
 			if (mipLevel == 0)
 				return;
-			levels.Add(mipLevel, n.ByteArrayData);
+			Levels.Add(mipLevel, n.ByteArrayData);
 		}
 
 		public override string ToString ()
 		{
-			return type;
+			return Type;
 		}
 	}
 }

@@ -291,10 +291,14 @@ public class TextEditBase
 
     public void Draw(RenderContext context, double globalTime)
     {
-        context.ScissorEnabled = true;
-        context.ScissorRectangle = new Rectangle(x,y,width,height);
+        if (!context.PushScissor(new Rectangle(x, y, width, height)))
+            return;
         Update(context.Renderer2D.CreateRichTextEngine());
-        var pos = richText.GetCaretPosition(nodes.Length - 1, CaretPosition - 1);
+        Rectangle pos;
+        if (nodes.Length == 1 && ((RichTextTextNode)nodes[0]).Contents == "")
+            pos = new Rectangle(0, 0, 1, (int)context.Renderer2D.CreateRichTextEngine().LineHeight(_fontName, _fontSize));
+        else
+            pos = richText.GetCaretPosition(nodes.Length - 1, CaretPosition - 1);
         int xOffset = 0;
         if (!_wrap && pos.X >= width) {
             xOffset = 5 + pos.X - width;
@@ -311,6 +315,6 @@ public class TextEditBase
             var caretRect = new Rectangle(x - xOffset + pos.X, y + pos.Y, pos.Width, pos.Height);
             context.Renderer2D.FillRectangle(caretRect, _fontColor);
         }
-        context.ScissorEnabled = false;
+        context.PopScissor();
     }
 }

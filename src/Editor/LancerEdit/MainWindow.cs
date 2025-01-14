@@ -193,16 +193,21 @@ namespace LancerEdit
             Services.Add(Config);
             Make3dbDlg = new CommodityIconDialog(this);
             LoadScripts();
+            int loadFrames = 0;
             Popups.AddPopup("Loading##systemviewer", _ =>
             {
-                ImGui.Text("Loading Universe Editor...");
+                ImGui.TextUnformatted($"Loading Universe Editor");
+                ImGui.ProgressBar(OpenDataContext.PreviewLoadPercent, new Vector2(180, 0) * ImGuiHelper.Scale);
                 ImGuiHelper.AnimatingElement();
-                if (!OpenDataContext.IterateRenderArchetypePreviews())
+                loadFrames++;
+                if ((loadFrames > 8 || loadFrames % 2 == 0) &&
+                    !OpenDataContext.IterateRenderArchetypePreviews(loadFrames > 8 ? 120 : 8))
                 {
                     this.AddTab(new UniverseEditorTab(OpenDataContext, this));
+                    loadFrames = 0;
                     ImGui.CloseCurrentPopup();
                 }
-            }, ImGuiWindowFlags.AlwaysAutoResize, true);
+            }, ImGuiWindowFlags.NoResize, true, new Vector2(200, 100) * ImGuiHelper.Scale);
             MinimumWindowSize = new Point(200, 200);
             h1 *= ImGuiHelper.Scale;
             h2 *= ImGuiHelper.Scale;
@@ -223,7 +228,7 @@ namespace LancerEdit
                 editor.SaveStrategy.Save();
                 return;
             }
-            Hotkeys hk = e.Key switch
+            Hotkeys hk = e.Key.Map() switch
             {
                 Keys.C when control && !popupOrTextEditing => Hotkeys.Copy,
                 Keys.V when control && !popupOrTextEditing => Hotkeys.Paste,
@@ -664,7 +669,7 @@ namespace LancerEdit
                 if (Theme.IconMenuItem(Icons.Table, "State Graph", true))
                 {
                     FileDialog.Open(
-                        input => AddTab(new StateGraphTab(new StateGraphDb(input, null), Path.GetFileName(input))),
+                        input => AddTab(new StateGraphTab(this, new StateGraphDb(input, null), input)),
                         AppFilters.StateGraphFilter
                         );
                 }
@@ -756,7 +761,7 @@ namespace LancerEdit
                 CenterText($"ImGui version: {ImGuiExt.Version}");
                 CenterText("Callum McGing");
                 CenterText("Librelancer Contributors");
-                CenterText("2018-2024");
+                CenterText("2018-2025");
                 ImGui.Separator();
                 var btnW = ImGui.CalcTextSize("OK").X + ImGui.GetStyle().FramePadding.X * 2;
                 ImGui.Dummy(Vector2.One);

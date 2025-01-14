@@ -288,17 +288,18 @@ namespace LibreLancer.World
             }
         }
 
-        public GameObject(Archetype arch, ResourceManager res, bool draw = true, bool phys = true)
+        public GameObject(Archetype arch, Archs.Sun sun, ResourceManager res, bool draw = true, bool phys = true)
         {
-            InitWithArchetype(arch, res, draw, phys);
+            InitWithArchetype(arch, sun, res, draw, phys);
 		}
 
-        public void InitWithArchetype(Archetype arch, ResourceManager res, bool draw = true, bool phys = true)
+        public void InitWithArchetype(Archetype arch, Archs.Sun sun, ResourceManager res, bool draw = true, bool phys = true)
         {
             Kind = arch.Type == ArchetypeType.waypoint ? GameObjectKind.Waypoint : GameObjectKind.Solar;
-            if (arch is Archs.Sun)
+            if (sun != null)
             {
-                RenderComponent = new SunRenderer((Archs.Sun)arch);
+                InitWithModel(arch.ModelFile.LoadFile(res), res, false, true);
+                RenderComponent = new SunRenderer(sun);
             }
             else
             {
@@ -334,6 +335,7 @@ namespace LibreLancer.World
                 PhysicsComponent.Mass = ship.Mass;
                 PhysicsComponent.Inertia = ship.RotationInertia;
             }
+            AddComponent(new ShipComponent(ship, this));
         }
 
         public GameObject(RigidModel model, CollisionMeshHandle collider, ResourceManager res, string partName, float mass, bool draw)
@@ -485,6 +487,17 @@ namespace LibreLancer.World
             }
         }
 
+        public bool TryGetFirstChildComponent<T>(out T result) where T : GameComponent
+        {
+            for (int i = 0; i < Children.Count; i++)
+            {
+                if (Children[i].TryGetComponent<T>(out result))
+                    return true;
+            }
+            result = null;
+            return false;
+        }
+
         public T GetFirstChildComponent<T>() where T : GameComponent
         {
             for (int i = 0; i < Children.Count; i++)
@@ -533,7 +546,6 @@ namespace LibreLancer.World
 
             public void Dispose() => Reset();
         }
-
 
 		public StructEnumerable<T, ChildComponentEnumerator<T>> GetChildComponents<T>() where T : GameComponent
         {

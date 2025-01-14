@@ -16,6 +16,7 @@ using LancerEdit.Materials;
 using LibreLancer.Data;
 using LibreLancer.Graphics;
 using LibreLancer.Graphics.Vertices;
+using LibreLancer.Physics;
 using LibreLancer.Render;
 using LibreLancer.Render.Cameras;
 using LibreLancer.Render.Materials;
@@ -144,7 +145,7 @@ namespace LancerEdit
             surs = new List<SurModel>();
             if((drawable is ModelFile))
             {
-                surs.Add(GetSurModel(surfile.GetMesh(0), null, surPart));
+                surs.Add(GetSurModel(surfile.GetMesh(new ConvexMeshId(0,0)), null, surPart));
                 foreach (var hp in vmsModel.Root.Hardpoints)
                 {
                     if (surfile.TryGetHardpoint(0, CrcTool.FLModelCrc(hp.Name), out var meshes))
@@ -160,7 +161,7 @@ namespace LancerEdit
                     var crc = CrcTool.FLModelCrc(kv.Key);
                     if (!surfile.HasShape(crc))
                         continue;
-                    surs.Add(GetSurModel(surfile.GetMesh(crc), kv.Value, surPart));
+                    surs.Add(GetSurModel(surfile.GetMesh(new ConvexMeshId(crc,0)), kv.Value, surPart));
                     foreach (var hp in kv.Value.Hardpoints)
                     {
                         if (surfile.TryGetHardpoint(crc, CrcTool.FLModelCrc(hp.Name), out var meshes))
@@ -199,9 +200,9 @@ namespace LancerEdit
             rstate.Cull = false;
             rstate.DepthWrite = false;
             var bm = ((BasicMaterial)mat);
+            bm.Dc = Color4.Red;
             bm.Oc = 1;
             bm.OcEnabled = true;
-            rstate.PolygonOffset = new Vector2(1, 1);
             var x = (ulong) Environment.TickCount << 8;
             foreach(var mdl in surs) {
                 if (mdl.Hardpoint && !surShowHps) continue;
@@ -215,10 +216,22 @@ namespace LancerEdit
                 x++;
                 mat.World = whandle;
                 mat.Use(rstate, new VertexPositionColor(), ref Lighting.Empty, 0);
+                rstate.PolygonOffset = new Vector2(1, 1);
                 foreach (var dc in mdl.Draws)
                     mdl.Vertices.Draw(PrimitiveTypes.TriangleList, dc.BaseVertex, dc.Start, dc.Count);
+                if (rstate.SupportsWireframe)
+                {
+                    rstate.PolygonOffset = new Vector2(2, 2);
+                    rstate.Wireframe = true;
+                    bm.Dc = Color4.Black;
+                    mat.Use(rstate, new VertexPosition(), ref Lighting.Empty, 0);
+                    foreach (var dc in mdl.Draws)
+                        mdl.Vertices.Draw(PrimitiveTypes.TriangleList, dc.BaseVertex, dc.Start, dc.Count);
+                }
+                rstate.Wireframe = false;
             }
             rstate.PolygonOffset = new Vector2(0, 0);
+            bm.Dc = Color4.Red;
             bm.OcEnabled = false;
             rstate.DepthWrite = true;
             rstate.Cull = true;

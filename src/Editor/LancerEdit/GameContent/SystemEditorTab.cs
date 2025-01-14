@@ -10,7 +10,9 @@ using LancerEdit.GameContent.Popups;
 using LibreLancer;
 using LibreLancer.ContentEdit;
 using LibreLancer.Data;
+using LibreLancer.Dialogs;
 using LibreLancer.GameData;
+using LibreLancer.GameData.Archetypes;
 using LibreLancer.GameData.World;
 using LibreLancer.Graphics;
 using LibreLancer.Graphics.Vertices;
@@ -21,6 +23,7 @@ using LibreLancer.Physics;
 using LibreLancer.Render;
 using LibreLancer.Render.Cameras;
 using LibreLancer.World;
+using SimpleMesh;
 using Archetype = LibreLancer.GameData.Archetype;
 using ModelRenderer = LibreLancer.Render.ModelRenderer;
 
@@ -265,7 +268,6 @@ public class SystemEditorTab : GameContentTab
         }
 
         var sel = ZoneList.Selected.Current;
-        var ez = ZoneList.Selected;
 
         if (ImGui.Button("Get Ini"))
         {
@@ -462,13 +464,14 @@ public class SystemEditorTab : GameContentTab
     }
 
 
-    public void SetArchetypeLoadout(GameObject obj, Archetype archetype, ObjectLoadout loadout)
+    public void SetArchetypeLoadout(GameObject obj, Archetype archetype, ObjectLoadout loadout, Sun star)
     {
         var ed = GetEditData(obj);
         ed.Archetype = archetype;
         ed.Loadout = loadout;
+        ed.Star = star;
         var tr = obj.LocalTransform;
-        World.InitObject(obj, true, obj.SystemObject, Data.Resources, false, true, ed.Loadout, ed.Archetype);
+        World.InitObject(obj, true, obj.SystemObject, Data.Resources, false, true, ed.Loadout, ed.Archetype, (OptionalArgument<Sun>)ed.Star);
         obj.AddComponent(ed);
         obj.SetLocalTransform(tr);
     }
@@ -585,16 +588,27 @@ public class SystemEditorTab : GameContentTab
 
         var oldArchetype = ed?.Archetype ?? sel.SystemObject.Archetype;
         var oldLoadout = ed != null ? ed.Loadout : sel.SystemObject.Loadout;
+        var oldStar = ed != null ? ed.Star : sel.SystemObject.Star;
 
         //Archetype
         Controls.PropertyRow("Archetype", gc.Archetype?.Nickname ?? "(none)");
         if (ImGui.Button($"{Icons.Edit}##archetype"))
         {
             Popups.OpenPopup(new ArchetypeSelection(
-                x => UndoBuffer.Commit(new ObjectSetArchetypeLoadout(
-                    sel, this, oldArchetype, oldLoadout, x, null)),
+                x => UndoBuffer.Commit(new ObjectSetArchetypeLoadoutStar(
+                    sel, this, oldArchetype, oldLoadout,oldStar, x, null, null)),
                 oldArchetype,
                 Data));
+        }
+        //Star
+        Controls.PropertyRow("Star", gc.Star?.Nickname ?? "(none)");
+        if (ImGui.Button($"{Icons.Edit}##star"))
+        {
+            Popups.OpenPopup(new StarSelection(
+                x => UndoBuffer.Commit(new ObjectSetArchetypeLoadoutStar(
+                    sel, this, oldArchetype, oldLoadout,oldStar, oldArchetype, oldLoadout, x)),
+                oldStar,
+                Data, win.RenderContext));
         }
 
         //Loadout
@@ -602,8 +616,8 @@ public class SystemEditorTab : GameContentTab
         if (ImGui.Button($"{Icons.Edit}##loadout"))
         {
             Popups.OpenPopup(new LoadoutSelection(
-                x => UndoBuffer.Commit(new ObjectSetArchetypeLoadout(
-                    sel, this, oldArchetype, oldLoadout, oldArchetype, x)),
+                x => UndoBuffer.Commit(new ObjectSetArchetypeLoadoutStar(
+                    sel, this, oldArchetype, oldLoadout, oldStar, oldArchetype, x, oldStar)),
                 oldLoadout,
                 sel.GetHardpoints().Select(x => x.Name).ToArray(),
                 Data));
@@ -1181,8 +1195,9 @@ public class SystemEditorTab : GameContentTab
             ImGui.SetNextWindowSize(new Vector2(300) * ImGuiHelper.Scale, ImGuiCond.FirstUseEver);
             if (ImGui.Begin("Map", ref mapOpen))
             {
+                ImGui.SliderFloat("Zoom", ref systemMap.Control.Zoom, 1, 10);
                 var szX = Math.Max(20, ImGui.GetWindowWidth());
-                var szY = Math.Max(20, ImGui.GetWindowHeight() - 37 * ImGuiHelper.Scale);
+                var szY = Math.Max(20, ImGui.GetWindowHeight() - 90 * ImGuiHelper.Scale);
                 systemMap.Draw((int)szX, (int)szY, 1 / 60.0f);
             }
             ImGui.End();

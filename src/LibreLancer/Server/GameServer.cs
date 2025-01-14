@@ -34,6 +34,8 @@ namespace LibreLancer.Server
         public bool SendDebugInfo = false;
         public string DebugInfo { get; private set; }
 
+        public string ScriptsFolder { get; set; }
+
         public IDesignTimeDbContextFactory<LibreLancerContext> DbContextFactory;
         public GameDataManager GameData;
         public ServerDatabase Database;
@@ -41,7 +43,7 @@ namespace LibreLancer.Server
         public WorldProvider Worlds;
         public ServerPerformance PerformanceStats;
 
-        public BaselinePrice[] BaselineGoodPrices;
+        public BaselinePriceBundle BaselineGoodPrices;
 
         volatile bool running = false;
 
@@ -187,7 +189,14 @@ namespace LibreLancer.Server
                 });
             }
 
-            BaselineGoodPrices = bp.ToArray();
+            if (Listener == null)
+            {
+                BaselineGoodPrices = new BaselinePriceBundle() { Prices = bp.ToArray() };
+            }
+            else
+            {
+                BaselineGoodPrices = BaselinePriceBundle.Compress(bp.ToArray());
+            }
         }
 
         public void SystemChatMessage(Player source, BinaryChatMessage message)
@@ -280,6 +289,7 @@ namespace LibreLancer.Server
         {
             if (needLoadData)
             {
+                LuaHardwire_LibreLancer.Initialize();
                 FLLog.Info("Server", "Loading Game Data...");
                 GameData.LoadData(null);
                 FLLog.Info("Server", "Finished Loading Game Data");

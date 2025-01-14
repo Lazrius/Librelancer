@@ -4,9 +4,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
 using LibreLancer.Graphics;
 using LibreLancer.ImageLib;
@@ -38,15 +36,15 @@ namespace LibreLancer.ContentEdit
     {
         DDS,
         Opaque,
-        Alpha,
-        ErrorNonSquare,
-        ErrorLoad,
-        ErrorNonPowerOfTwo
+        Alpha
     }
+
     public class AnalyzedTexture
     {
         public TexLoadType Type;
         public Texture2D Texture;
+        public bool OneBitAlpha = false;
+        public byte[] Source;
     }
 
     public class TextureImport
@@ -98,11 +96,11 @@ namespace LibreLancer.ContentEdit
             }
         }
 
-        public static EditResult<AnalyzedTexture> OpenFile(string input, RenderContext context)
+        public static EditResult<AnalyzedTexture> OpenBuffer(byte[] input, RenderContext context)
         {
             try
             {
-                using (var file = File.OpenRead(input))
+                using (var file = new MemoryStream(input))
                 {
                     if (DDS.StreamIsDDS(file))
                     {
@@ -114,11 +112,11 @@ namespace LibreLancer.ContentEdit
                     }
                 }
                 Image lr;
-                using (var file = File.OpenRead(input))
+                using (var file = new MemoryStream(input))
                 {
                     lr = Generic.ImageFromStream(file);
                 }
-                using (var file = File.OpenRead(input))
+                using (var file = new MemoryStream(input))
                 {
                     byte[] embedded;
                     if ((embedded = GetEmbeddedDDS(lr, file)) != null)
@@ -126,7 +124,8 @@ namespace LibreLancer.ContentEdit
                         return (new AnalyzedTexture()
                         {
                             Type = TexLoadType.DDS,
-                            Texture = (Texture2D)DDS.FromStream(context, new MemoryStream(embedded))
+                            Texture = context == null ? null : (Texture2D)DDS.FromStream(context, new MemoryStream(embedded)),
+                            Source = input
                         }).AsResult();
                     }
                 }
@@ -142,20 +141,32 @@ namespace LibreLancer.ContentEdit
                 var opaque = true;
                 var pixels = Bgra8.BufferFromBytes(lr.Data);
                 //Swap channels + check alpha
+                bool oneBitAlpha = true;
                 for (int i = 0; i < pixels.Length; i++)
                 {
                     if (pixels[i].A != 255)
                     {
                         opaque = false;
-                        break;
                     }
+                    if (pixels[i].A != 255 && pixels[i].A != 0)
+                    {
+                        oneBitAlpha = false;
+                    }
+                    if (!opaque && !oneBitAlpha)
+                        break;
                 }
-                var tex = new Texture2D(context, lr.Width, lr.Height);
-                tex.SetData(lr.Data);
+                if (opaque)
+                    oneBitAlpha = false;
+                Texture2D tex = null;
+                if (context != null)
+                {
+                    tex = new Texture2D(context, lr.Width, lr.Height);
+                    tex.SetData(lr.Data);
+                }
                 return new EditResult<AnalyzedTexture>(new AnalyzedTexture()
                 {
                     Type = opaque ? TexLoadType.Opaque : TexLoadType.Alpha,
-                    Texture = tex
+                    Texture = tex, OneBitAlpha = oneBitAlpha, Source = input
                 }, warning);
             }
             catch (Exception e)
@@ -163,45 +174,117 @@ namespace LibreLancer.ContentEdit
                 return EditResult<AnalyzedTexture>.Error($"Could not load file {input}");
             }
         }
-        static Image ReadFile(string input, bool flip)
+        static Image ReadBuffer(byte[] input, bool flip)
         {
-            using (var file = File.OpenRead(input))
+            using (var file = new MemoryStream(input))
             {
                 return Generic.ImageFromStream(file, flip);
             }
         }
-        static byte[] TargaRGBA(byte[] data, int width, int height)
+
+        static (bool Alpha, bool Palette, int PaletteCount) SmallestEncoding(ReadOnlySpan<Bgra8> pixels, Span<Bgra8> palette)
         {
-            using (var stream = new MemoryStream())
-            {
-                var writer = new BinaryWriter(stream);
-                writer.Write((byte)0); //idlength
-                writer.Write((byte)0); //no color map
-                writer.Write((byte)2); //uncompressed rgb
-                writer.Write((short) 0); //no color map
-                writer.Write((short)0); //no color map
-                writer.Write((byte) 0); //no color map
-                writer.Write((short)0); //zero origin
-                writer.Write((short)0); //zero origin
-                writer.Write((ushort)width);
-                writer.Write((ushort)height);
-                writer.Write((byte)32); //32 bpp BGRA
-                writer.Write((byte)0); //descriptor
-                writer.Write(data);
-                return stream.ToArray();
+            bool alpha = false;
+            int px = 0;
+            for (int i = 0; i < pixels.Length; i++) {
+                if (pixels[i].A != 255) {
+                    alpha = true;
+                }
+                if (px != -1 && !palette.Slice(0, px).Contains(pixels[i])) {
+                    if (px == 255) {
+                        px = -1;
+                    } else {
+                        palette[px++] = pixels[i];
+                    }
+                }
+                if (px == -1 && !alpha) {
+                    break;
+                }
+            }
+            int bytesPerPixel = alpha ? 4 : 3;
+            if (px != -1 && ((bytesPerPixel * px) + (pixels.Length)) < (bytesPerPixel * pixels.Length)) {
+                return (alpha, true, px);
+            } else {
+                return (alpha, false, -1);
             }
         }
-        public static byte[] TGANoMipmap(string input, bool flip)
+
+        static byte[] NoPalette(ReadOnlySpan<Bgra8> pixels, bool alpha, int width, int height)
         {
-            var raw = ReadFile(input, flip);
+            FLLog.Debug("Targa", $"Generating {(alpha ? 32 : 24)}-bit RGB image");
+            using var stream = new MemoryStream();
+            var writer = new BinaryWriter(stream);
+            writer.Write((byte)0); //idlength
+            writer.Write((byte)0); //no color map
+            writer.Write((byte)2); //uncompressed rgb
+            writer.Write((short) 0); //no color map
+            writer.Write((short)0); //no color map
+            writer.Write((byte) 0); //no color map
+            writer.Write((short)0); //zero origin
+            writer.Write((short)0); //zero origin
+            writer.Write((ushort)width);
+            writer.Write((ushort)height);
+            writer.Write((byte)(alpha ? 32 : 24)); //32 bpp BGRA
+            writer.Write((byte)0); //descriptor
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                writer.Write(pixels[i].B);
+                writer.Write(pixels[i].G);
+                writer.Write(pixels[i].R);
+                if(alpha) writer.Write(pixels[i].A);
+            }
+            return stream.ToArray();
+        }
+
+        static byte[] TargaRGBA(byte[] data, int width, int height)
+        {
+            var pixels = Bgra8.BufferFromBytes(data);
+            Span<Bgra8> palette = stackalloc Bgra8[256];
+            var (alpha, usePalette, paletteCount) = SmallestEncoding(pixels, palette);
+            if (!usePalette)
+                return NoPalette(pixels, alpha, width, height);
+            FLLog.Debug("Targa", $"Generating {(alpha ? 32 : 24)}-bit indexed image ({paletteCount})");
+            using var stream = new MemoryStream();
+            var writer = new BinaryWriter(stream);
+            writer.Write((byte)0); //idlength
+            writer.Write((byte)1); //indexed
+            writer.Write((byte)1); //indexed
+            writer.Write((short)0); //offset 0
+            writer.Write((short)paletteCount); //palette length
+            writer.Write((byte)(alpha ? 32 : 24)); //palette bits
+            writer.Write((short)0); //zero origin
+            writer.Write((short)0); //zero origin
+            writer.Write((ushort)width);
+            writer.Write((ushort)height);
+            writer.Write((byte)8); //8 bit palette index
+            writer.Write((byte)0); //descriptor
+            for (int i = 0; i < paletteCount; i++)
+            {
+                writer.Write(palette[i].B);
+                writer.Write(palette[i].G);
+                writer.Write(palette[i].R);
+                if(alpha) writer.Write(palette[i].A);
+            }
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                writer.Write((byte)(palette.IndexOf(pixels[i])));
+            }
+            return stream.ToArray();
+        }
+
+
+        public static byte[] TGANoMipmap(byte[] input, bool flip)
+        {
+            var raw = ReadBuffer(input, flip);
             return TargaRGBA(raw.Data, raw.Width, raw.Height);
         }
-        public static List<LUtfNode> TGAMipmaps(string input, MipmapMethod mipm, bool flip)
+        public static List<LUtfNode> TGAMipmaps(byte[] input, MipmapMethod mipm, bool flip)
         {
-            var raw = ReadFile(input, flip);
+            var raw = ReadBuffer(input, flip);
             var mips = Crunch.GenerateMipmaps(Bgra8.BufferFromBytes(raw.Data), raw.Width, raw.Height, (CrnglueMipmaps) mipm);
-            var nodes = new List<LUtfNode>(mips.Count);
-            for (int i = 0; i < mips.Count; i++)
+            //Limit mips from MIP0 to MIP9 or we generate invalid txm nodes
+            var nodes = new List<LUtfNode>(mips.Count > 9 ? 9 : mips.Count);
+            for (int i = 0; i < mips.Count && i <= 9; i++)
             {
                 var n = new LUtfNode {Name = "MIP" + i, Data = TargaRGBA(mips[i].Bytes, mips[i].Width, mips[i].Height)};
                 nodes.Add(n);
@@ -232,9 +315,14 @@ namespace LibreLancer.ContentEdit
             }
         }
 
-        public static byte[] CreateDDS(string input, DDSFormat format, MipmapMethod mipm, bool slow, bool flip)
+        public static byte[] CreateDDS(ReadOnlySpan<Bgra8> input, int width, int height, DDSFormat format, MipmapMethod mipm, bool slow)
         {
-            var raw = ReadFile(input, flip);
+            return Crunch.CompressDDS(input, width, height, (CrnglueFormat) format, (CrnglueMipmaps) mipm, slow);
+        }
+
+        public static byte[] CreateDDS(byte[] input, DDSFormat format, MipmapMethod mipm, bool slow, bool flip)
+        {
+            var raw = ReadBuffer(input, flip);
             return Crunch.CompressDDS(Bgra8.BufferFromBytes(raw.Data), raw.Width, raw.Height, (CrnglueFormat) format, (CrnglueMipmaps) mipm, slow);
         }
     }

@@ -141,13 +141,19 @@ public class ImportedModel
             ApplyDefaultPose(anm, child);
     }
 
-    static bool IsHull(ModelNode node)
+    static bool IsIgnored(ModelNode node)
     {
-        return node.Properties.ContainsKey("hull") ||
-               node.Name.EndsWith("$hull");
+        return node.Properties.ContainsKey("export_ignore");
     }
 
-    static bool GetHardpoint(ModelNode node, out HardpointDefinition hp)
+    static bool IsHull(ModelNode node)
+    {
+        return !IsIgnored(node) &&
+               (node.Properties.ContainsKey("hull") ||
+                node.Name.EndsWith("$hull"));
+    }
+
+    static bool GetHardpoint(ModelNode node, out ImportedHardpoint hp)
     {
         hp = null;
         PropertyValue pv;
@@ -155,6 +161,7 @@ public class ImportedModel
             return false;
         var orientation = Matrix4x4.CreateFromQuaternion(node.Transform.ExtractRotation());
         var position = Vector3.Transform(Vector3.Zero, node.Transform);
+        HardpointDefinition hpdef;
         if (node.Properties.TryGetValue("hptype", out pv) && pv.AsString(out var hptype) &&
             hptype.Equals("rev", StringComparison.OrdinalIgnoreCase))
         {
@@ -170,7 +177,7 @@ public class ImportedModel
             if (min > max) {
                 (min, max) = (max, min);
             }
-            hp = new RevoluteHardpointDefinition(node.Name) {
+            hpdef = new RevoluteHardpointDefinition(node.Name) {
                 Orientation = orientation,
                 Position = position,
                 Min = MathHelper.DegreesToRadians(min),
@@ -180,8 +187,10 @@ public class ImportedModel
         }
         else
         {
-            hp = new FixedHardpointDefinition(node.Name) {Orientation = orientation, Position = position};
+            hpdef = new FixedHardpointDefinition(node.Name) {Orientation = orientation, Position = position};
         }
+
+        hp = new ImportedHardpoint() { Hardpoint = hpdef, Hulls = node.Children.Where(IsHull).ToList() };
         return true;
     }
 
@@ -319,8 +328,10 @@ public class ImportedModel
                 if (g != null)
                     mdl.LODs.Add(g);
         }
-        foreach(var child in obj.Children) {
-
+        foreach(var child in obj.Children)
+        {
+            if (IsIgnored(child))
+                continue;
             if(IsHull(child))
                 mdl.Hulls.Add(child);
             else if (IsWire(child))
@@ -507,12 +518,12 @@ public class ImportedModel
             foreach (var mat in materials)
             {
                 var dt = mat.DiffuseTexture?.Name ?? (settings.GeneratePlaceholderTextures ? mat.Name : null);
-                GenerateTexture(dt, createdTextures, txms, settings, DDSFormat.DXT5, tasks);
-                GenerateTexture(mat.EmissiveTexture?.Name, createdTextures, txms, settings, DDSFormat.DXT1, tasks);
+                GenerateTexture(dt, warnings, createdTextures, txms, settings, DDSFormat.DXT5, tasks);
+                GenerateTexture(mat.EmissiveTexture?.Name, warnings, createdTextures, txms, settings, DDSFormat.DXT1, tasks);
                 if (settings.AdvancedMaterials)
                 {
-                    GenerateTexture(mat.NormalTexture?.Name, createdTextures, txms, settings, DDSFormat.RGTC2, tasks);
-                    GenerateMetallicRoughnessTexture(mat.MetallicRoughnessTexture?.Name, createdTextures, txms, settings, tasks);
+                    GenerateTexture(mat.NormalTexture?.Name, warnings, createdTextures, txms, settings, DDSFormat.RGTC2, tasks);
+                    GenerateMetallicRoughnessTexture(mat.MetallicRoughnessTexture?.Name, warnings, createdTextures, txms, settings, tasks);
                 }
             }
 
@@ -527,24 +538,39 @@ public class ImportedModel
         return new EditResult<EditableUtf>(utf, warnings);
     }
 
-    void GenerateMetallicRoughnessTexture(string texture, HashSet<string> createdTextures, LUtfNode txms, ModelImporterSettings settings, TaskHandler tasks)
+    void GenerateMetallicRoughnessTexture(string texture, List<EditMessage> warnings, HashSet<string> createdTextures, LUtfNode txms, ModelImporterSettings settings, TaskHandler tasks)
     {
         if (string.IsNullOrWhiteSpace(texture)) return;
         if (!createdTextures.Add(texture)) return;
         if (settings.ImportTextures && Images != null && Images.TryGetValue(texture, out var img))
         {
-            txms.Children.Add(ImportTextureNode(txms, texture + "_METAL", img.Data, DDSFormat.MetallicRGTC1, tasks));
-            txms.Children.Add(ImportTextureNode(txms, texture + "_ROUGH", img.Data ,DDSFormat.RoughnessRGTC1, tasks));
+            var mtl = ImportTextureNode(txms, texture + "_METAL", img.Data, DDSFormat.MetallicRGTC1, tasks);
+            var rough = ImportTextureNode(txms, texture + "_ROUGH", img.Data, DDSFormat.RoughnessRGTC1, tasks);
+            if(mtl.IsSuccess)
+                txms.Children.Add(mtl.Data);
+            else
+                warnings.Add(EditMessage.Warning($"{texture}_METAL not imported"));
+            warnings.AddRange(mtl.Messages.Select(x => EditMessage.Warning(x.Message)));
+            if (rough.IsSuccess)
+                txms.Children.Add(rough.Data);
+            else
+                warnings.Add(EditMessage.Warning($"{texture}_ROUGH not imported"));
+            warnings.AddRange(rough.Messages.Select(x => EditMessage.Warning(x.Message)));
         }
     }
 
-    void GenerateTexture(string texture, HashSet<string> createdTextures, LUtfNode txms, ModelImporterSettings settings, DDSFormat format, TaskHandler tasks)
+    void GenerateTexture(string texture, List<EditMessage> warnings, HashSet<string> createdTextures, LUtfNode txms, ModelImporterSettings settings, DDSFormat format, TaskHandler tasks)
     {
         if (string.IsNullOrWhiteSpace(texture)) return;
         if (!createdTextures.Add(texture)) return;
         if (settings.ImportTextures && Images != null && Images.TryGetValue(texture, out var img))
         {
-            txms.Children.Add(ImportTextureNode(txms, texture, img.Data, format, tasks));
+            var result = ImportTextureNode(txms, texture, img.Data, format, tasks);
+            if(result.IsSuccess)
+                txms.Children.Add(result.Data);
+            else
+                warnings.Add(EditMessage.Warning($"{texture} not imported"));
+            warnings.AddRange(result.Messages.Select(x => EditMessage.Warning(x.Message)));
         }
         else if (settings.GeneratePlaceholderTextures)
         {
@@ -615,13 +641,24 @@ public class ImportedModel
         return matnode;
     }
 
-    static LUtfNode ImportTextureNode(LUtfNode parent, string name, ReadOnlySpan<byte> data, DDSFormat format, TaskHandler tasks)
+    static EditResult<LUtfNode> ImportTextureNode(LUtfNode parent, string name, ReadOnlySpan<byte> data, DDSFormat format, TaskHandler tasks)
     {
         var texnode = new LUtfNode() { Name = name + ".dds", Parent = parent };
         texnode.Children = new List<LUtfNode>();
         var d = data.ToArray();
-        tasks.Run(() => texnode.Children.Add(TextureImport.ImportAsMIPSNode(d, texnode, format)));
-        return texnode;
+
+        var analyzed = TextureImport.OpenBuffer(d, null);
+        if (!analyzed.IsError) {
+            if (format == DDSFormat.DXT5 && analyzed.Data.Type == TexLoadType.Opaque) {
+                format = DDSFormat.DXT1;
+            }
+            tasks.Run(() => texnode.Children.Add(TextureImport.ImportAsMIPSNode(d, texnode, format)));
+        }
+        else
+        {
+            return EditResult<LUtfNode>.Error($"{name}: {analyzed.AllMessages()}");
+        }
+        return new EditResult<LUtfNode>(texnode, analyzed.Messages.Select(x => EditMessage.Warning($"{name}: {x.Message}")));
     }
 
     static LUtfNode DefaultTextureNode(LUtfNode parent, string name)
@@ -756,7 +793,7 @@ public class ImportedModel
         writer.Write(VMeshWire.HEADER_SIZE);
         writer.Write(crc);
         writer.Write(vertexOffset);
-        writer.Write((ushort)(max - vertexOffset)); //vertex count
+        writer.Write((ushort)(max - vertexOffset + 1)); //vertex count
         writer.Write((ushort)(indices.Length)); //index count
         writer.Write(max); //max vertex
         foreach(var i in indices)
@@ -860,7 +897,7 @@ public class ImportedModel
         if (mdl.Hardpoints.Count > 0)
         {
             var hp = new ModelHpNode() {Node = node3db};
-            hp.HardpointsToNodes(mdl.Hardpoints.Select(x => new Hardpoint(x, null)).ToList());
+            hp.HardpointsToNodes(mdl.Hardpoints.Select(x => new Hardpoint(x.Hardpoint, null)).ToList());
         }
 
         if (mdl.Wire != null)

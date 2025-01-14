@@ -461,7 +461,7 @@ namespace LibreLancer.ImUI
             ImGui.GetWindowDrawList().AddCallback((IntPtr) 1, (IntPtr) BlendMode.Normal);
         }
 
-        private static Action<Rectangle>[] callbacks = new Action<Rectangle>[128];
+        private static Action<Rectangle>[] callbacks = new Action<Rectangle>[4096];
         private static int cbIndex = 0;
         public static IntPtr Callback(Action<Rectangle> callback)
         {
@@ -636,12 +636,11 @@ namespace LibreLancer.ImUI
 						dot.BindTo(0);
 					}
 
-                    rstate.ScissorEnabled = true;
-                    rstate.ScissorRectangle = new Rectangle((int) pcmd.ClipRect.X, (int) pcmd.ClipRect.Y,
-                        (int) (pcmd.ClipRect.Z - pcmd.ClipRect.X),
-                        (int) (pcmd.ClipRect.W - pcmd.ClipRect.Y));
+                    rstate.PushScissor(new Rectangle((int)pcmd.ClipRect.X, (int)pcmd.ClipRect.Y,
+                        (int)(pcmd.ClipRect.Z - pcmd.ClipRect.X),
+                        (int)(pcmd.ClipRect.W - pcmd.ClipRect.Y)));
                     vbo.Draw(PrimitiveTypes.TriangleList, (int)pcmd.VtxOffset, (int)pcmd.IdxOffset, (int)pcmd.ElemCount / 3);
-                    rstate.ScissorEnabled = false;
+                    rstate.PopScissor();
 				}
 			}
 

@@ -178,7 +178,7 @@ namespace LibreLancer.Client
             }
             else
             {
-                LastAck = 0;
+                Acks = default;
                 processUpdatePackets = false;
                 gp = new SpaceGameplay(Game, this);
                 Game.ChangeState(gp);
@@ -214,7 +214,7 @@ namespace LibreLancer.Client
 
         private CircularBuffer<PlayerMoveState> moveState = new CircularBuffer<PlayerMoveState>(128);
         private CircularBuffer<SPUpdatePacket> oldPackets = new CircularBuffer<SPUpdatePacket>(1000);
-        public uint LastAck = 0;
+        public UpdateAck Acks;
 
         struct PlayerMoveState
         {
@@ -288,7 +288,7 @@ namespace LibreLancer.Client
                 var ip = new InputUpdatePacket()
                 {
                     Current = FromMoveState(0),
-                    AckTick = LastAck,
+                    Acks = Acks,
                 };
                 if (gp.Selection.Selected != null)
                 {
@@ -360,12 +360,28 @@ namespace LibreLancer.Client
             };
         }
 
+        ObjectUpdate GetUpdate(uint tick, int id)
+        {
+            for (int i = 0; i < oldPackets.Count; i++) {
+                if (oldPackets[i].Tick == tick) {
+                    for (int j = 0; j < oldPackets[i].Updates.Length; j++)
+                    {
+                        if (oldPackets[i].Updates[j].ID.Value == id)
+                        {
+                            return oldPackets[i].Updates[j];
+                        }
+                    }
+                    throw new Exception($"History {tick} missing id {id}");
+                }
+            }
+            throw new Exception($"History {tick} missing");
+        }
+
         SPUpdatePacket GetUpdatePacket(IPacket p)
         {
             if (p is SPUpdatePacket sp) return sp;
             var mp = (PackedUpdatePacket) p;
             var oldPlayerState = new PlayerAuthState();
-            var oldUpdates = Array.Empty<ObjectUpdate>();
             if (mp.OldTick != 0)
             {
                 int i;
@@ -373,13 +389,12 @@ namespace LibreLancer.Client
                     if (oldPackets[i].Tick == mp.OldTick)
                     {
                         oldPlayerState = oldPackets[i].PlayerState;
-                        oldUpdates = oldPackets[i].Updates;
                         break;
                     }
                 }
                 if (i == oldPackets.Count) {
                     FLLog.Error("Net", $"Unable to find old tick {mp.OldTick}, resetting ack");
-                    LastAck = 0;
+                    Acks = default;
                     return null;
                 }
             }
@@ -388,10 +403,17 @@ namespace LibreLancer.Client
             var nsp = new SPUpdatePacket();
             nsp.Tick = mp.Tick;
             nsp.InputSequence = mp.InputSequence;
-            (nsp.PlayerState, nsp.Updates) =
-                mp.GetUpdates(oldPlayerState, oldUpdates, (connection as GameNetClient).HpidReader);
+            (nsp.PlayerState, nsp.Updates) = mp.GetUpdates(oldPlayerState, GetUpdate);
             oldPackets.Enqueue(nsp);
-            LastAck = mp.Tick;
+            // Create new acknowledgement history
+            var prevAcks = Acks;
+            Acks = new UpdateAck(mp.Tick, 0);
+            for(uint i = 1; i < 64; i++)
+            {
+                uint tick = mp.Tick - i;
+                Acks[tick] = prevAcks[tick];
+            }
+
             return nsp;
         }
 
@@ -642,7 +664,7 @@ namespace LibreLancer.Client
                     go.World = gp.world;
                     if (mn.Def.ConstEffect != null)
                     {
-                       var fx = Game.GameData.GetEffect(mn.Def.ConstEffect)?
+                       var fx = Game.GameData.Effects.Get(mn.Def.ConstEffect)?
                             .GetEffect(Game.ResourceManager);
                        var ren = new ParticleEffectRenderer(fx) {Attachment = go.GetHardpoint(mn.Def.HpTrailParent) };
                        go.ExtraRenderers.Add(ren);
@@ -869,9 +891,9 @@ namespace LibreLancer.Client
         }
 
         public Dictionary<uint, ulong> BaselinePrices = new Dictionary<uint, ulong>();
-        void IClientPlayer.UpdateBaselinePrices(BaselinePrice[] prices)
+        void IClientPlayer.UpdateBaselinePrices(BaselinePriceBundle prices)
         {
-            foreach (var p in prices)
+            foreach (var p in prices.Prices)
                 BaselinePrices[p.GoodCRC] = p.Price;
         }
 
@@ -927,7 +949,7 @@ namespace LibreLancer.Client
                     if (o == null)
                     {
                         var arch = Game.GameData.GetSolarArchetype(si.Archetype);
-                        var go = new GameObject(arch, Game.ResourceManager, true);
+                        var go = new GameObject(arch, null, Game.ResourceManager, true);
                         go.SetLocalTransform(new Transform3D(si.Position, si.Orientation));
                         go.Nickname = si.Nickname;
                         go.Name = si.Name;
@@ -1116,8 +1138,7 @@ namespace LibreLancer.Client
             {
                 health.CurrentHealth = update.HullValue;
             }
-            var sh = obj.GetFirstChildComponent<CShieldComponent>();
-            if (sh != null) {
+            if (obj.TryGetFirstChildComponent<CShieldComponent>(out var sh)) {
                 sh.SetShieldHealth(update.ShieldValue);
             }
             if (obj.TryGetComponent<WeaponControlComponent>(out var weapons) && (update.Guns?.Length ?? 0) > 0)

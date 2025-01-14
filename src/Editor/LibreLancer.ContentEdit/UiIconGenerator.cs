@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Numerics;
 using System.Text;
 using BepuUtilities;
@@ -17,7 +18,7 @@ namespace LibreLancer.ContentEdit
     public static class UiIconGenerator
     {
         static Vertex IcoVert(Vector3 pos, Vector2 tex1) => new Vertex(
-            pos, Vector3.UnitZ, Vector4.One, Vector4.Zero,
+            pos, Vector3.UnitZ, LinearColor.White, Vector4.Zero,
             tex1, Vector2.Zero, Vector2.Zero, Vector2.Zero);
 
         private static Vertex[] vertices_ship = {
@@ -34,7 +35,7 @@ namespace LibreLancer.ContentEdit
         public static EditableUtf UncompressedFromFile(string iconName, string filename, bool alpha)
         {
             var texNode = new LUtfNode();
-            var tgaNodes = TextureImport.TGAMipmaps(filename, MipmapMethod.Lanczos4, true);
+            var tgaNodes = TextureImport.TGAMipmaps(File.ReadAllBytes(filename), MipmapMethod.Lanczos4, true);
             foreach (var n in tgaNodes)
                 n.Parent = texNode;
             texNode.Children = tgaNodes;
@@ -47,7 +48,7 @@ namespace LibreLancer.ContentEdit
             ddsNode.Children.Add(new LUtfNode()
             {
                 Name = "MIPS",
-                Data = TextureImport.CreateDDS(filename, DDSFormat.DXT5, MipmapMethod.Lanczos4, true, true),
+                Data = TextureImport.CreateDDS(File.ReadAllBytes(filename), DDSFormat.DXT5, MipmapMethod.Lanczos4, true, true),
                 Parent = ddsNode,
             });
             return Generate(iconName, ddsNode, alpha);

@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 using ImGuiNET;
 namespace LibreLancer.ImUI
 {
-    public unsafe class ImGuiExt
+    public static unsafe class ImGuiExt
     {
         [DllImport("cimgui", CallingConvention =  CallingConvention.Cdecl)]
         internal static extern void igFtLoad();
@@ -46,6 +46,17 @@ namespace LibreLancer.ImUI
         [DllImport("cimgui", CallingConvention = CallingConvention.Cdecl)]
         public static extern ImFontGlyph* igFontFindGlyph(ImFont* font, uint c);
 
+        [DllImport("cimgui", CallingConvention = CallingConvention.Cdecl)]
+        static extern void igExtDrawListAddTriangleMesh(IntPtr drawlist, IntPtr vertices, int count, uint color);
+
+        public static void AddTriangleMesh(this ImDrawListPtr drawList, Vector2[] vertices, int count, VertexDiffuse color)
+        {
+            fixed (Vector2* ptr = vertices)
+            {
+                igExtDrawListAddTriangleMesh((IntPtr)drawList.NativePtr, (IntPtr)ptr, count, color);
+            }
+        }
+
         public static unsafe bool BeginModalNoClose(string name, ImGuiWindowFlags flags)
         {
             Span<byte> nbytes = stackalloc byte[512];
@@ -53,6 +64,12 @@ namespace LibreLancer.ImUI
             fixed (byte* p = native_name.ToUTF8Z())
                 return ImGuiNative.igBeginPopupModal(p, (byte*)0, flags) != 0;
         }
+
+        [DllImport("cimgui", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void igExtRenderArrow(float x, float y);
+
+        [DllImport("cimgui", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int igExtGetNextWidth(out float nextWidth);
 
         public static unsafe bool ComboButton(string id, string preview)
         {

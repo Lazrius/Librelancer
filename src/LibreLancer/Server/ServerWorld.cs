@@ -31,6 +31,8 @@ namespace LibreLancer.Server
 
         public NetIDGenerator IdGenerator = new NetIDGenerator();
 
+        UpdatePacker packer = new UpdatePacker();
+
         public bool Paused => paused;
 
         private bool paused = false;
@@ -347,7 +349,7 @@ namespace LibreLancer.Server
             actions.Enqueue(() =>
             {
                 var arch = Server.GameData.GetSolarArchetype(archetype);
-                var gameobj = new GameObject(arch, Server.Resources, false);
+                var gameobj = new GameObject(arch, null, Server.Resources, false);
                 gameobj.ArchetypeName = archetype;
                 gameobj.NetID = IdGenerator.Allocate();
                 if (idsName != 0)
@@ -541,21 +543,90 @@ namespace LibreLancer.Server
             }
         }
 
+        record struct SortedUpdate(FetchedDelta Old, int Size, int Offset, GameObject Object, ObjectUpdate Update) : IComparable<SortedUpdate>
+        {
+            public int CompareTo(SortedUpdate other)
+            {
+                var x = ((ulong)other.Old.Priority) << 32 | (uint)other.Size;
+                var y = ((ulong)Old.Priority) << 32 | (uint)Size;
+                return x.CompareTo(y);
+            }
+        }
+
+        class IdComparer : IComparer<SortedUpdate>
+        {
+            public static readonly IdComparer Instance = new IdComparer();
+            private IdComparer() { }
+            public int Compare(SortedUpdate x, SortedUpdate y) =>
+                x.Update.ID.Value.CompareTo(y.Update.ID.Value);
+        }
+
         //This could do with some work
         void SendWorldUpdates(uint tick)
         {
+            // Update players
             foreach(var player in Players)
             {
                 var tr = player.Value.WorldTransform;
                 player.Key.Position = tr.Position;
                 player.Key.Orientation = tr.Orientation;
             }
-
+            // Fetch data
             var toUpdate = GetUpdatingObjects().ToArray();
+            var allUpdates = new ObjectUpdate[toUpdate.Length];
 
+            for (int i = 0; i < toUpdate.Length; i++)
+            {
+                //Get main object update fields
+                var obj = toUpdate[i];
+                var update = new ObjectUpdate();
+                update.ID = new ObjNetId(obj.NetID);
+                var tr = obj.WorldTransform;
+                update.Position = tr.Position;
+                update.Orientation = tr.Orientation;
+                if (obj.PhysicsComponent != null)
+                {
+                    update.SetVelocity(
+                        obj.PhysicsComponent.Body.LinearVelocity,
+                        obj.PhysicsComponent.Body.AngularVelocity
+                        );
+                }
+                if (obj.TryGetComponent<SEngineComponent>(out var eng))
+                    update.Throttle = eng.Speed;
+                if(obj.TryGetComponent<ShipPhysicsComponent>(out var objPhysics))
+                {
+                    switch (objPhysics.EngineState)
+                    {
+                        case EngineStates.CruiseCharging:
+                            update.CruiseThrust = CruiseThrustState.CruiseCharging;
+                            break;
+                        case EngineStates.Cruise:
+                            update.CruiseThrust = CruiseThrustState.Cruising;
+                            break;
+                        case EngineStates.Standard when objPhysics.ThrustEnabled:
+                            update.CruiseThrust = CruiseThrustState.Thrusting;
+                            break;
+                    }
+                }
+                if (obj.TryGetComponent<SHealthComponent>(out var health))
+                {
+                    update.HullValue = (long)health.CurrentHealth;
+                    var sh = obj.GetFirstChildComponent<SShieldComponent>();
+                    if (sh != null)
+                    {
+                        update.ShieldValue = (long)sh.Health;
+                    }
+                }
+                if (obj.TryGetComponent<WeaponControlComponent>(out var weapons))
+                {
+                    update.Guns = weapons.GetRotations();
+                }
+                allUpdates[i] = update;
+            }
+            // Send data to players
+            var pk = packer.Begin(allUpdates, toUpdate);
             foreach (var player in Players)
             {
-                List<ObjectUpdate> ps = new List<ObjectUpdate>();
                 var phealthcomponent = player.Value.GetComponent<SHealthComponent>();
                 var phealth = phealthcomponent.CurrentHealth;
                 var pshieldComponent = player.Value.GetFirstChildComponent<SShieldComponent>();
@@ -563,65 +634,7 @@ namespace LibreLancer.Server
                 if (pshieldComponent != null)
                     pshield = pshieldComponent.Health;
                 var selfPlayer = player.Value.GetComponent<SPlayerComponent>();
-                foreach (var obj in toUpdate)
-                {
-                    //Skip self
-                    if (obj.TryGetComponent<SPlayerComponent>(out var pComp) &&
-                        pComp.Player == player.Key)
-                        continue;
-                    //Update object
-                    var update = new ObjectUpdate();
-                    update.ID = new ObjNetId(obj.NetID);
-                    var tr = obj.WorldTransform;
-                    update.Position = tr.Position;
-                    update.Orientation = tr.Orientation;
-                    if (obj.PhysicsComponent != null)
-                    {
-                        update.SetVelocity(
-                            obj.PhysicsComponent.Body.LinearVelocity,
-                            obj.PhysicsComponent.Body.AngularVelocity
-                            );
-                    }
-
-                    if (obj.TryGetComponent<SEngineComponent>(out var eng))
-                        update.Throttle = eng.Speed;
-                    if (obj.TryGetComponent<SRepComponent>(out var rep))
-                    {
-                        update.RepToPlayer = rep.GetRep(player.Value);
-                    }
-                    if(obj.TryGetComponent<ShipPhysicsComponent>(out var objPhysics))
-                    {
-                        switch (objPhysics.EngineState)
-                        {
-                            case EngineStates.CruiseCharging:
-                                update.CruiseThrust = CruiseThrustState.CruiseCharging;
-                                break;
-                            case EngineStates.Cruise:
-                                update.CruiseThrust = CruiseThrustState.Cruising;
-                                break;
-                            case EngineStates.Standard when objPhysics.ThrustEnabled:
-                                update.CruiseThrust = CruiseThrustState.Thrusting;
-                                break;
-                        }
-                    }
-                    if (obj.TryGetComponent<SHealthComponent>(out var health))
-                    {
-                        update.HullValue = (long)health.CurrentHealth;
-                        var sh = obj.GetFirstChildComponent<SShieldComponent>();
-                        if (sh != null)
-                        {
-                            update.ShieldValue = (long)sh.Health;
-                        }
-                    }
-                    if (obj.TryGetComponent<WeaponControlComponent>(out var weapons))
-                    {
-                        update.Guns = weapons.GetRotations();
-                    }
-                    ps.Add(update);
-                }
-
                 var phys = player.Value.GetComponent<ShipPhysicsComponent>();
-                var newUpdates = ps.ToArray();
                 var state = new PlayerAuthState
                 {
                     Health = phealth,
@@ -635,23 +648,30 @@ namespace LibreLancer.Server
                 };
                 if (player.Key.SinglePlayer)
                 {
+                    var lst = new ObjectUpdate[allUpdates.Length - 1];
+                    int j = 0;
+                    for (int i = 0; i < allUpdates.Length; i++)
+                    {
+                        if (toUpdate[i] == player.Value)
+                            continue;
+                        lst[j++] = allUpdates[i];
+                    }
                     player.Key.SendSPUpdate(new SPUpdatePacket()
                     {
                         Tick = tick,
                         InputSequence = selfPlayer.LatestReceived,
                         PlayerState = state,
-                        Updates = newUpdates,
+                        Updates = lst
                     });
                 }
                 else
                 {
-                    selfPlayer.GetAcknowledgedState(out var oldTick, out var oldState, out var oldUpdates);
-                    var packet = new PackedUpdatePacket();
-                    packet.Tick = tick;
-                    packet.OldTick = oldTick;
-                    packet.InputSequence = selfPlayer.LatestReceived;
-                    selfPlayer.EnqueueState((uint)tick, state,  packet.SetUpdates(state, oldState, oldUpdates, newUpdates, player.Key.HpidWriter));
-                    player.Key.SendMPUpdate(packet);
+                    #if DEBUG
+                    int maxPacketSize = 500; //Min safe UDP packet size - 8
+                    #else
+                    int maxPacketSize = player.Key.Client.MaxSequencedSize;
+                    #endif
+                    player.Key.SendMPUpdate(pk.Pack(tick, state, selfPlayer, player.Value, maxPacketSize));
                 }
             }
         }

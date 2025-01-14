@@ -11,10 +11,10 @@ using LibreLancer.World;
 
 namespace LancerEdit;
 
-public class ArchetypePreviews : IDisposable
+public class PreviewRenderer : IDisposable
 {
     static SystemLighting lighting;
-    static ArchetypePreviews()
+    static PreviewRenderer()
     {
         lighting = new SystemLighting();
         lighting.Lights.Add(new DynamicLight()
@@ -43,7 +43,7 @@ public class ArchetypePreviews : IDisposable
     private SystemRenderer renderer;
 
     public GameResourceManager Resources => resources;
-    public ArchetypePreviews(MainWindow win, GameResourceManager resources, string cacheDir)
+    public PreviewRenderer(MainWindow win, GameResourceManager resources)
     {
         this.win = win;
         this.resources = resources;
@@ -53,7 +53,7 @@ public class ArchetypePreviews : IDisposable
         renderer.SystemLighting = lighting;
     }
 
-    public Texture2D RenderPreview(Asteroid asteroid, int width, int height)
+    public Texture2D Render(Asteroid asteroid, int width, int height)
     {
         var mdl = asteroid.ModelFile.LoadFile(resources);
         var radius = 10f;
@@ -102,7 +102,7 @@ public class ArchetypePreviews : IDisposable
         return renderTarget.Texture;
     }
 
-    public Texture2D RenderPreview(Archetype archetype, int width, int height)
+    public Texture2D Render(Archetype archetype, int width, int height)
     {
         var mdl = archetype.ModelFile?.LoadFile(resources).Drawable;
         var radius = 10f;
@@ -119,7 +119,7 @@ public class ArchetypePreviews : IDisposable
         var res = Vector3.Transform(new Vector3(0, 0, radius* 2.35f), mat);
         camera.Update(width, height, res, Vector3.Zero);
         var world = new GameWorld(renderer, resources, null, false);
-        var obj = new GameObject(archetype, resources, true, false);
+        var obj = new GameObject(archetype, null, resources, true, false);
         if(archetype.Loadout != null)
             obj.SetLoadout(archetype.Loadout);
         obj.SetLocalTransform(Transform3D.Identity);

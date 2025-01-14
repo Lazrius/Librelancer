@@ -7,17 +7,21 @@ using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Security;
 using LibreLancer.Data;
+using LibreLancer.Data.Effects;
 using LibreLancer.Data.Equipment;
 using LibreLancer.Data.Fuses;
 using LibreLancer.Data.Goods;
 using LibreLancer.Data.Missions;
 using LibreLancer.Data.Solar;
 using LibreLancer.GameData;
+using LibreLancer.GameData.Archetypes;
 using LibreLancer.GameData.Items;
 using LibreLancer.GameData.Market;
 using LibreLancer.GameData.World;
 using LibreLancer.Graphics;
+using LibreLancer.Physics;
 using LibreLancer.Render;
 using LibreLancer.Thorn.VM;
 using LibreLancer.Utf.Anm;
@@ -131,6 +135,74 @@ namespace LibreLancer
         {
             if (path == null) return null;
             return new() {SourcePath = path, VFS = VFS, DataPath = DataPath(path), ReadCallback = ThornReadCallback};
+        }
+
+        class EffectStorage
+        {
+            public Dictionary<string, VisEffect> VisFx = new Dictionary<string, VisEffect>(StringComparer.OrdinalIgnoreCase);
+            public Dictionary<string, BeamSpear> BeamSpears = new Dictionary<string, BeamSpear>(StringComparer.OrdinalIgnoreCase);
+            public Dictionary<string, BeamBolt> BeamBolts = new Dictionary<string, BeamBolt>(StringComparer.OrdinalIgnoreCase);
+        }
+        private EffectStorage fxdata;
+        public GameItemCollection<ResolvedFx> Effects;
+        public GameItemCollection<ResolvedFx> VisEffects;
+        void InitEffects()
+        {
+            fxdata = new EffectStorage();
+            foreach (var fx in fldata.Effects.VisEffects)
+                fxdata.VisFx[fx.Nickname] = fx;
+            foreach (var fx in fldata.Effects.BeamSpears)
+                fxdata.BeamSpears[fx.Nickname] = fx;
+            foreach (var fx in fldata.Effects.BeamBolts)
+                fxdata.BeamBolts[fx.Nickname] = fx;
+            Effects = new GameItemCollection<ResolvedFx>();
+            VisEffects = new GameItemCollection<ResolvedFx>();
+            foreach (var fx in fldata.Effects.VisEffects)
+            {
+                string alepath = null;
+                if (!string.IsNullOrWhiteSpace(fx.AlchemyPath))
+                    alepath = DataPath(fx.AlchemyPath);
+                var lib = fx.Textures.Select(DataPath).Where(x => x != null).ToArray();
+                VisEffects.Add(new ResolvedFx()
+                {
+                    AlePath = alepath,
+                    VisFxCrc = (uint)fx.EffectCrc,
+                    LibraryFiles = lib,
+                    CRC = FLHash.CreateID(fx.Nickname),
+                    Nickname = fx.Nickname
+                });
+            }
+            foreach (var effect in fldata.Effects.Effects)
+            {
+                VisEffect visfx = null;
+                BeamSpear spear = null;
+                BeamBolt bolt = null;
+                if(!string.IsNullOrWhiteSpace(effect.VisEffect))
+                    fxdata.VisFx.TryGetValue(effect.VisEffect, out visfx);
+                if (!string.IsNullOrWhiteSpace(effect.VisBeam))
+                {
+                    fxdata.BeamSpears.TryGetValue(effect.VisBeam, out spear);
+                    fxdata.BeamBolts.TryGetValue(effect.VisBeam, out bolt);
+                }
+                string alepath = null;
+                if (!string.IsNullOrWhiteSpace(visfx?.AlchemyPath))
+                {
+                    alepath = DataPath(visfx.AlchemyPath);
+                }
+                var lib = visfx != null
+                    ? visfx.Textures.Select(DataPath).Where(x => x != null).ToArray()
+                    : null;
+                Effects.Add(new ResolvedFx()
+                {
+                    AlePath = alepath,
+                    VisFxCrc = (uint)(visfx?.EffectCrc ?? 0),
+                    LibraryFiles = lib,
+                    Spear = spear,
+                    Bolt = bolt,
+                    CRC = FLHash.CreateID(effect.Nickname),
+                    Nickname = effect.Nickname
+                });
+            }
         }
 
         IEnumerable<Data.Universe.Base> InitBases(LoadingTasks tasks)
@@ -445,7 +517,8 @@ namespace LibreLancer
             if(glResource != null)
                 tasks.Begin(() => GetCharacterAnimations());
             var pilotTask = tasks.Begin(InitPilots);
-            var explosionTask = tasks.Begin(InitExplosions);
+            var effectsTask = tasks.Begin(InitEffects);
+            var explosionTask = tasks.Begin(InitExplosions, effectsTask);
             var ships = tasks.Begin(InitShips, explosionTask);
             List<Data.Universe.Base> introbases = new List<Data.Universe.Base>();
             var baseTask = tasks.Begin(() => introbases.AddRange(InitBases(tasks)));
@@ -478,10 +551,11 @@ namespace LibreLancer
                 }
             }, baseTask);
             var factionsTask = tasks.Begin(InitFactions);
-            var equipmentTask = tasks.Begin(InitEquipment);
+            var equipmentTask = tasks.Begin(InitEquipment, effectsTask);
             var goodsTask = tasks.Begin(InitGoods, equipmentTask);
             var loadoutsTask = tasks.Begin(InitLoadouts, equipmentTask);
             var archetypesTask = tasks.Begin(InitArchetypes, loadoutsTask);
+            var starsTask = tasks.Begin(InitStars);
             var astsTask = tasks.Begin(InitAsteroids);
             tasks.Begin(InitMarkets, baseTask, goodsTask, archetypesTask);
             tasks.Begin(InitBodyParts);
@@ -493,7 +567,8 @@ namespace LibreLancer
                 factionsTask,
                 loadoutsTask,
                 pilotTask,
-                astsTask
+                astsTask,
+                starsTask
                 );
             tasks.WaitAll();
             fldata.Universe = null; //Free universe ini!
@@ -632,11 +707,11 @@ namespace LibreLancer
                 return;
             var cvx = res.ConvexCollection.UseFile(surpath);
             if(mdl.Source == RigidModelSource.SinglePart)
-                res.ConvexCollection.CreateShape(cvx, 0);
+                res.ConvexCollection.CreateShape(cvx, new ConvexMeshId(0,0));
             else
             {
                 foreach(var p in mdl.AllParts)
-                    res.ConvexCollection.CreateShape(cvx, CrcTool.FLModelCrc(p.Name));
+                    res.ConvexCollection.CreateShape(cvx, new ConvexMeshId(0, CrcTool.FLModelCrc(p.Name)));
             }
         }
 
@@ -732,21 +807,18 @@ namespace LibreLancer
                     if (mequip.Explosion != null &&
                        !string.IsNullOrEmpty(mequip.Explosion.Effect))
                     {
-                        mequip.ExplodeFx = GetEffect(mequip.Explosion.Effect);
+                        mequip.ExplodeFx = Effects.Get(mequip.Explosion.Effect);
                     }
                     equip = mequip;
                 }
                 else
                 {
-                    var effect = fldata.Effects.FindEffect(mn.ConstEffect);
-                    string visbeam;
-                    if (effect == null) visbeam = "";
-                    else visbeam = effect.VisBeam ?? "";
+                    var effect = Effects.Get(mn.ConstEffect);
                     var mequip = new GameData.Items.MunitionEquip()
                     {
                         Def = mn,
-                        ConstEffect_Spear = fldata.Effects.BeamSpears.FirstOrDefault((x) => x.Nickname.Equals(visbeam, StringComparison.OrdinalIgnoreCase)),
-                        ConstEffect_Bolt = fldata.Effects.BeamBolts.FirstOrDefault((x) => x.Nickname.Equals(visbeam, StringComparison.OrdinalIgnoreCase))
+                        ConstEffect_Spear = effect?.Spear,
+                        ConstEffect_Bolt = effect?.Bolt,
                     };
                     equip = mequip;
                 }
@@ -810,7 +882,7 @@ namespace LibreLancer
                             Munition = mn,
                             Def = gn
                         };
-                        eqp.FlashEffect = GetEffect(gn.FlashParticleName);
+                        eqp.FlashEffect = Effects.Get(gn.FlashParticleName);
                         equip = eqp;
                         equip.ModelFile = ResolveDrawable(gn.MaterialLibrary, gn.DaArchetype);
                     }
@@ -841,7 +913,7 @@ namespace LibreLancer
                         HpType = "hp_thruster"
                     };
                     equip = eqp;
-                    eqp.Particles = GetEffect(th.Particles);
+                    eqp.Particles = Effects.Get(th.Particles);
                     equip.ModelFile = ResolveDrawable(th.MaterialLibrary, th.DaArchetype);
                 }
                 if (val is Data.Equipment.ShieldGenerator sh)
@@ -888,7 +960,7 @@ namespace LibreLancer
                 if (val is Tradelane tl)
                 {
                     var tlequip = new TradelaneEquipment();
-                    tlequip.RingActive = GetEffect(tl.TlRingActive);
+                    tlequip.RingActive = Effects.Get(tl.TlRingActive);
                     equip = tlequip;
                 }
 
@@ -1619,7 +1691,7 @@ namespace LibreLancer
                 var ex = new GameData.Explosion() {Nickname = orig.Nickname};
                 ex.CRC = CrcTool.FLModelCrc(ex.Nickname);
                 if(orig.Effects.Count > 0)
-                    ex.Effect = GetEffect(orig.Effects[0].Name);
+                    ex.Effect = Effects.Get(orig.Effects[0].Name);
                 Explosions.Add(ex);
             }
         }
@@ -1653,6 +1725,8 @@ namespace LibreLancer
                 ship.CRC = FLHash.CreateID(ship.Nickname);
                 ship.MaxShieldBatteries = orig.ShieldBatteryLimit;
                 ship.MaxRepairKits = orig.NanobotLimit;
+                ship.ShieldLinkHull = orig.ShieldLink?.HardpointMount;
+                ship.ShieldLinkSource = orig.ShieldLink?.HardpointShield;
                 foreach (var fuse in orig.Fuses)
                 {
                     ship.Fuses.Add(new DamageFuse()
@@ -1703,6 +1777,68 @@ namespace LibreLancer
                 dyn.ModelFile = ResolveDrawable(dynast.MaterialLibrary, dynast.DaArchetype);
                 dyn.CRC = CrcTool.FLModelCrc(dyn.Nickname);
                 DynamicAsteroids.Add(dyn);
+            }
+        }
+
+        public GameItemCollection<Sun> Stars;
+
+        void InitStars()
+        {
+            FLLog.Info("Game", "Initing " + fldata.Stars.Stars.Count + " stars");
+            var glows = new Dictionary<string, StarGlow>(StringComparer.OrdinalIgnoreCase);
+            var spines = new Dictionary<string, Spines>(StringComparer.OrdinalIgnoreCase);
+            StarGlow GetGlow(string g)
+            {
+                if (string.IsNullOrWhiteSpace(g)) return null;
+                glows.TryGetValue(g, out var glow);
+                return glow;
+            }
+            Spines GetSpines(string id)
+            {
+                if (string.IsNullOrWhiteSpace(id)) return null;
+                spines.TryGetValue(id, out var sp);
+                return sp;
+            }
+            foreach (var glow in fldata.Stars.StarGlows) {
+                glows[glow.Nickname] = glow;
+            }
+            foreach (var sp in fldata.Stars.Spines) {
+                spines[sp.Nickname] = sp;
+            }
+            Stars = new GameItemCollection<Sun>();
+            foreach (var star in fldata.Stars.Stars)
+            {
+                var s = new Sun()
+                {
+                    Nickname = star.Nickname,
+                    CRC = FLHash.CreateID(star.Nickname),
+                    Radius = star.Radius
+                };
+                //glow
+                var starglow = GetGlow(star.StarGlow);
+                s.GlowSprite = starglow.Shape;
+                s.GlowColorInner = starglow.InnerColor;
+                s.GlowColorOuter = starglow.OuterColor;
+                s.GlowScale = starglow.Scale;
+                //center
+                var centerglow = GetGlow(star.StarCenter);
+                if (centerglow != null)
+                {
+                    s.CenterSprite = centerglow.Shape;
+                    s.CenterColorInner = centerglow.InnerColor;
+                    s.CenterColorOuter = centerglow.OuterColor;
+                    s.CenterScale = centerglow.Scale;
+                }
+                var sp = GetSpines(star.Spines);
+                if (sp != null)
+                {
+                    s.SpinesSprite = sp.Shape;
+                    s.SpinesScale = sp.RadiusScale;
+                    s.Spines = new List<Spine>(sp.Items.Count);
+                    foreach (var it in sp.Items)
+                        s.Spines.Add(new Spine(it.LengthScale, it.WidthScale, it.InnerColor, it.OuterColor, it.Alpha));
+                }
+                Stars.Add(s);
             }
         }
 
@@ -1855,51 +1991,7 @@ namespace LibreLancer
             else if (o.PrevRing != null && o.TradelaneSpaceName != 0) {
                 obj.IdsRight = o.TradelaneSpaceName;
             }
-            if (obj.Archetype?.Type == Data.Solar.ArchetypeType.sun)
-            {
-                if (o.Star != null) //Not sure what to do if there's no star?
-                {
-                    var sun = new GameData.Archetypes.Sun();
-                    sun.Nickname = o.Star;
-                    sun.Type = ArchetypeType.sun;
-                    sun.NavmapIcon = obj.Archetype.NavmapIcon;
-                    sun.SolarRadius = obj.Archetype.SolarRadius;
-                    var star = fldata.Stars.FindStar(o.Star);
-                    //general
-                    sun.Radius = star.Radius.Value;
-                    //glow
-                    var starglow = fldata.Stars.FindStarGlow(star.StarGlow);
-                    sun.GlowSprite = starglow.Shape;
-                    sun.GlowColorInner = starglow.InnerColor;
-                    sun.GlowColorOuter = starglow.OuterColor;
-                    sun.GlowScale = starglow.Scale;
-                    //center
-                    if (star.StarCenter != null)
-                    {
-                        var centerglow = fldata.Stars.FindStarGlow(star.StarCenter);
-                        sun.CenterSprite = centerglow.Shape;
-                        sun.CenterColorInner = centerglow.InnerColor;
-                        sun.CenterColorOuter = centerglow.OuterColor;
-                        sun.CenterScale = centerglow.Scale;
-                    }
-                    if (star.Spines != null)
-                    {
-                        var spines = fldata.Stars.FindSpines(star.Spines);
-                        if (spines != null)
-                        {
-                            sun.SpinesSprite = spines.Shape;
-                            sun.SpinesScale = spines.RadiusScale;
-                            sun.Spines = new List<Spine>(spines.Items.Count);
-                            foreach (var sp in spines.Items)
-                                sun.Spines.Add(new Spine(sp.LengthScale, sp.WidthScale, sp.InnerColor, sp.OuterColor, sp.Alpha));
-                        }
-                        else
-                            FLLog.Error("Stararch", "Could not find spines " + star.Spines);
-                    }
-                    obj.Star = sun;
-                }
-            }
-            else if (obj.Archetype?.Type == Data.Solar.ArchetypeType.tradelane_ring)
+            if (obj.Archetype?.Type == Data.Solar.ArchetypeType.tradelane_ring)
             {
                 obj.Dock = new DockAction()
                 {
@@ -1911,7 +2003,7 @@ namespace LibreLancer
             else if (obj.Archetype == null) {
                 FLLog.Error("Systems", $"Object {obj.Nickname} in {system} has bad archetype '{o.Archetype ?? "NULL"}'");
             }
-
+            obj.Star = Stars.Get(o.Star);
             obj.Loadout = GetLoadout(o.Loadout);
             return obj;
         }
@@ -1940,7 +2032,7 @@ namespace LibreLancer
                             if(string.IsNullOrEmpty(fza.Effect)) continue;
                             if (!fuse.Fx.ContainsKey(fza.Effect))
                             {
-                                fuse.Fx[fza.Effect] = GetEffect(fza.Effect);
+                                fuse.Fx[fza.Effect] = Effects.Get(fza.Effect);
                             }
                         }
                     }
@@ -1951,41 +2043,12 @@ namespace LibreLancer
             }
         }
 
-        public bool HasEffect(string effectName)
-        {
-            return fldata.Effects.FindEffect(effectName) != null || fldata.Effects.FindVisEffect(effectName) != null;
-        }
-
-        public ResolvedFx GetEffect(string effectName)
-        {
-            var effect = fldata.Effects.FindEffect(effectName);
-            Data.Effects.VisEffect visfx;
-            if (effect == null)
-                visfx = fldata.Effects.FindVisEffect(effectName);
-            else
-                visfx = fldata.Effects.FindVisEffect(effect.VisEffect);
-            if (effect == null && visfx == null)
-            {
-                FLLog.Error("Fx", $"Can't find fx '{effectName}'");
-                return null;
-            }
-            if (visfx == null) return null;
-            if(string.IsNullOrWhiteSpace(visfx.AlchemyPath)) return null;
-            var alepath = DataPath(visfx.AlchemyPath);
-            if (alepath == null) return null;
-            return new ResolvedFx()
-            {
-                AlePath = alepath,
-                VisFxCrc = (uint)visfx.EffectCrc,
-                LibraryFiles = visfx.Textures.Select(DataPath).Where(x => x != null).ToArray()
-            };
-        }
 
         GameData.Items.EffectEquipment GetAttachedFx(Data.Equipment.AttachedFx fx)
         {
             var equip = new GameData.Items.EffectEquipment()
             {
-                Particles = GetEffect(fx.Particles)
+                Particles = Effects.Get(fx.Particles)
             };
             return equip;
         }

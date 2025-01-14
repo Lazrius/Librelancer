@@ -529,7 +529,8 @@ World Time: {12:F2}
                 g.FadeOut(0.2, () =>
                 {
                     g.session.OnExit();
-                    var embeddedServer = new EmbeddedServer(g.Game.GameData, g.Game.ResourceManager);
+                    var embeddedServer =
+                        new EmbeddedServer(g.Game.GameData, g.Game.ResourceManager, g.Game.GetSaveFolder());
                     var session = new CGameSession(g.Game, embeddedServer);
                     embeddedServer.StartFromSave(g.Game.Saves.SelectedFile, File.ReadAllBytes(g.Game.Saves.SelectedFile));
                     g.Game.ChangeState(new NetWaitState(session, g.Game));
@@ -1248,7 +1249,7 @@ World Time: {12:F2}
                 if (pos != Vector3.Zero)
                 {
                     var waypointArch = Game.GameData.GetSolarArchetype("waypoint");
-                    missionWaypoint = new GameObject(waypointArch, Game.ResourceManager);
+                    missionWaypoint = new GameObject(waypointArch, null, Game.ResourceManager);
                     missionWaypoint.Name = new ObjectName(1091); //Mission Waypoint
                     missionWaypoint.SetLocalTransform(new Transform3D(pos, Quaternion.Identity));
                     missionWaypoint.World = world;
@@ -1385,7 +1386,7 @@ World Time: {12:F2}
                     {
                         if (floats.Length > 0)
                         {
-                            ImGui.TextUnformatted($"last ack received: {session.LastAck}");
+                            ImGui.TextUnformatted($"last ack received: {session.Acks.Tick}");
                             ImGui.TextUnformatted($"update packet size: {floats[floats.Length - 1]}");
                             ImGui.PlotLines("update packet size", ref floats[0], floats.Length);
                         }

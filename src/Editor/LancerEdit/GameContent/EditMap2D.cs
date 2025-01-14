@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Numerics;
 using ImGuiNET;
 using LancerEdit.GameContent.Popups;
@@ -156,6 +157,20 @@ public class EditMap2D
                     (VertexDiffuse)Color4.Yellow);
             }
         }
+
+        foreach (var z in tab.ZoneList.Zones)
+        {
+            if (!z.Visible)
+                continue;
+            var mesh = z.Current.TopDownMesh();
+            var transformed = ArrayPool<Vector2>.Shared.Rent(mesh.Length);
+            var wp = ImGui.GetWindowPos();
+            for (int i = 0; i < mesh.Length; i++)
+                transformed[i] = wp + WorldToMap(z.Current.Position + new Vector3(mesh[i].X, 0, mesh[i].Y));
+            dlist.AddTriangleMesh(transformed, mesh.Length, (VertexDiffuse)Color4.Pink);
+            ArrayPool<Vector2>.Shared.Return(transformed);
+        }
+
         //Context menu
         ImGui.SetCursorPos(new Vector2(gridMargin));
         ImGui.InvisibleButton("##canvas", new Vector2(renderWidth, renderHeight));

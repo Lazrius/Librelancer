@@ -211,7 +211,7 @@ class GLRenderContext : IRenderContext
         }
     }
 
-    public void Set2DState(bool depth, bool cull, bool scissor)
+    public void Set2DState(bool depth, bool cull)
     {
         if (depth != applied.DepthEnabled)
         {
@@ -230,14 +230,9 @@ class GLRenderContext : IRenderContext
             else
                 GL.Disable(GL.GL_CULL_FACE);
         }
-        if (scissor != applied.ScissorEnabled)
-        {
-            if(scissor)
-                GL.Enable(GL.GL_SCISSOR_TEST);
-            else
-                GL.Disable(GL.GL_SCISSOR_TEST);
-        }
     }
+
+    private Rectangle appliedConvertedScissor = new Rectangle();
 
     public void ApplyScissor(ref GraphicsState requested)
     {
@@ -248,13 +243,17 @@ class GLRenderContext : IRenderContext
             applied.ScissorEnabled = requested.ScissorEnabled;
         }
 
-        if (requested.ScissorEnabled & (requested.ScissorRect != applied.ScissorRect))
+        if (requested.ScissorEnabled)
         {
             var cr = requested.ScissorRect;
             applied.ScissorRect = cr;
             if (cr.Height < 1) cr.Height = 1;
             if (cr.Width < 1) cr.Width = 1;
-            GL.Scissor(cr.X, applied.Viewport.Height - cr.Y - cr.Height, cr.Width, cr.Height);
+            var conv = new Rectangle(cr.X, applied.Viewport.Height - cr.Y - cr.Height, cr.Width, cr.Height);
+            if (conv != appliedConvertedScissor) {
+                GL.Scissor(cr.X, applied.Viewport.Height - cr.Y - cr.Height, cr.Width, cr.Height);
+                appliedConvertedScissor = conv;
+            }
         }
     }
 
@@ -311,15 +310,17 @@ class GLRenderContext : IRenderContext
         GL.MemoryBarrier(GL.GL_SHADER_STORAGE_BARRIER_BIT);
     }
 
-    public void PrepareBlit()
+    public void PrepareBlit(bool scissor)
     {
         applied.RenderTarget = null;
-        if (applied.ScissorEnabled)
+        if (!scissor && applied.ScissorEnabled)
         {
             applied.ScissorEnabled = false;
             GL.Disable(GL.GL_SCISSOR_TEST);
         }
     }
+
+    public IRenderTarget CurrentTarget=> applied.RenderTarget;
 
     public void ApplyRenderTarget(ref GraphicsState requested)
     {
@@ -383,13 +384,13 @@ class GLRenderContext : IRenderContext
         new GLDepthBuffer(width, height);
 
     public ITexture2D CreateTexture2D(int width, int height, bool hasMipMaps, SurfaceFormat format) =>
-        new GLTexture2D(width, height, hasMipMaps, format);
+        new GLTexture2D(this, width, height, hasMipMaps, format);
 
     public ITextureCube CreateTextureCube(int size, bool mipMap, SurfaceFormat format) =>
         new GLTextureCube(size, mipMap, format);
 
     public IDepthMap CreateDepthMap(int width, int height) =>
-        new GLDepthMap(width, height);
+        new GLDepthMap(this, width, height);
 
     public IRenderTarget2D CreateRenderTarget2D(ITexture2D texture, IDepthBuffer buffer) =>
         new GLRenderTarget2D(this, (GLTexture2D)texture, (GLDepthBuffer)buffer);
